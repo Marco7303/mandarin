@@ -1,0 +1,1212 @@
+[
+  {
+    "id": "unit-1-1",
+    "setId": "unit-1",
+    "traditional": "你",
+    "english": "you",
+    "pinyin": "nǐ",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "nǐ",
+    "numbered": "ni3",
+    "alignment": [
+      {
+        "character": "你",
+        "pinyin": "nǐ"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-2",
+    "setId": "unit-1",
+    "traditional": "陳",
+    "english": "Chen (surname)",
+    "pinyin": "chén",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "chén",
+    "numbered": "chen2",
+    "alignment": [
+      {
+        "character": "陳",
+        "pinyin": "chén"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-3",
+    "setId": "unit-1",
+    "traditional": "月",
+    "english": "moon; month",
+    "pinyin": "yuè",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "yuè",
+    "numbered": "yue4",
+    "alignment": [
+      {
+        "character": "月",
+        "pinyin": "yuè"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-4",
+    "setId": "unit-1",
+    "traditional": "美",
+    "english": "beautiful",
+    "pinyin": "měi",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "měi",
+    "numbered": "mei3",
+    "alignment": [
+      {
+        "character": "美",
+        "pinyin": "měi"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-5",
+    "setId": "unit-1",
+    "traditional": "李",
+    "english": "Li (surname); plum",
+    "pinyin": "lǐ",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "lǐ",
+    "numbered": "li3",
+    "alignment": [
+      {
+        "character": "李",
+        "pinyin": "lǐ"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-6",
+    "setId": "unit-1",
+    "traditional": "明",
+    "english": "bright",
+    "pinyin": "míng",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "míng",
+    "numbered": "ming2",
+    "alignment": [
+      {
+        "character": "明",
+        "pinyin": "míng"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-7",
+    "setId": "unit-1",
+    "traditional": "華",
+    "english": "splendour; Chinese",
+    "pinyin": "huá",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "huá",
+    "numbered": "hua2",
+    "alignment": [
+      {
+        "character": "華",
+        "pinyin": "huá"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-8",
+    "setId": "unit-1",
+    "traditional": "王",
+    "english": "king; Wang (surname)",
+    "pinyin": "wáng",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "wáng",
+    "numbered": "wang2",
+    "alignment": [
+      {
+        "character": "王",
+        "pinyin": "wáng"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-9",
+    "setId": "unit-1",
+    "traditional": "開",
+    "english": "open",
+    "pinyin": "kāi",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "kāi",
+    "numbered": "kai1",
+    "alignment": [
+      {
+        "character": "開",
+        "pinyin": "kāi"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-10",
+    "setId": "unit-1",
+    "traditional": "文",
+    "english": "writing; language",
+    "pinyin": "wén",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "wén",
+    "numbered": "wen2",
+    "alignment": [
+      {
+        "character": "文",
+        "pinyin": "wén"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-11",
+    "setId": "unit-1",
+    "traditional": "來",
+    "english": "come",
+    "pinyin": "lái",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "lái",
+    "numbered": "lai2",
+    "alignment": [
+      {
+        "character": "來",
+        "pinyin": "lái"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-12",
+    "setId": "unit-1",
+    "traditional": "是",
+    "english": "to be; yes",
+    "pinyin": "shì",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "shì",
+    "numbered": "shi4",
+    "alignment": [
+      {
+        "character": "是",
+        "pinyin": "shì"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-13",
+    "setId": "unit-1",
+    "traditional": "小",
+    "english": "small",
+    "pinyin": "xiǎo",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "xiǎo",
+    "numbered": "xiao3",
+    "alignment": [
+      {
+        "character": "小",
+        "pinyin": "xiǎo"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-14",
+    "setId": "unit-1",
+    "traditional": "姐",
+    "english": "older sister; Miss",
+    "pinyin": "jiě",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "jiě",
+    "numbered": "jie3",
+    "alignment": [
+      {
+        "character": "姐",
+        "pinyin": "jiě"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-15",
+    "setId": "unit-1",
+    "traditional": "嗎",
+    "english": "question particle",
+    "pinyin": "ma",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "ma",
+    "numbered": "ma5",
+    "alignment": [
+      {
+        "character": "嗎",
+        "pinyin": "ma"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-16",
+    "setId": "unit-1",
+    "traditional": "接",
+    "english": "receive; pick up",
+    "pinyin": "jiē",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "jiē",
+    "numbered": "jie1",
+    "alignment": [
+      {
+        "character": "接",
+        "pinyin": "jiē"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-17",
+    "setId": "unit-1",
+    "traditional": "我",
+    "english": "I; me",
+    "pinyin": "wǒ",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "wǒ",
+    "numbered": "wo3",
+    "alignment": [
+      {
+        "character": "我",
+        "pinyin": "wǒ"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-18",
+    "setId": "unit-1",
+    "traditional": "們",
+    "english": "plural suffix (for people)",
+    "pinyin": "men",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "men",
+    "numbered": "men5",
+    "alignment": [
+      {
+        "character": "們",
+        "pinyin": "men"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-19",
+    "setId": "unit-1",
+    "traditional": "這",
+    "english": "this",
+    "pinyin": "zhè",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "zhè",
+    "numbered": "zhe4",
+    "alignment": [
+      {
+        "character": "這",
+        "pinyin": "zhè"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-20",
+    "setId": "unit-1",
+    "traditional": "先",
+    "english": "first; earlier",
+    "pinyin": "xiān",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "xiān",
+    "numbered": "xian1",
+    "alignment": [
+      {
+        "character": "先",
+        "pinyin": "xiān"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-21",
+    "setId": "unit-1",
+    "traditional": "生",
+    "english": "be born; student (in 先生: Mr)",
+    "pinyin": "shēng",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "shēng",
+    "numbered": "sheng1",
+    "alignment": [
+      {
+        "character": "生",
+        "pinyin": "shēng"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-22",
+    "setId": "unit-1",
+    "traditional": "好",
+    "english": "good; well",
+    "pinyin": "hǎo",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "hǎo",
+    "numbered": "hao3",
+    "alignment": [
+      {
+        "character": "好",
+        "pinyin": "hǎo"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-23",
+    "setId": "unit-1",
+    "traditional": "姓",
+    "english": "surname; to be surnamed",
+    "pinyin": "xìng",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "xìng",
+    "numbered": "xing4",
+    "alignment": [
+      {
+        "character": "姓",
+        "pinyin": "xìng"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-24",
+    "setId": "unit-1",
+    "traditional": "叫",
+    "english": "to be called; call",
+    "pinyin": "jiào",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "jiào",
+    "numbered": "jiao4",
+    "alignment": [
+      {
+        "character": "叫",
+        "pinyin": "jiào"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-25",
+    "setId": "unit-1",
+    "traditional": "臺",
+    "english": "platform (臺灣: Taiwan)",
+    "pinyin": "tái",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "tái",
+    "numbered": "tai2",
+    "alignment": [
+      {
+        "character": "臺",
+        "pinyin": "tái"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-26",
+    "setId": "unit-1",
+    "traditional": "灣",
+    "english": "bay (臺灣: Taiwan)",
+    "pinyin": "wān",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "wān",
+    "numbered": "wan1",
+    "alignment": [
+      {
+        "character": "灣",
+        "pinyin": "wān"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-27",
+    "setId": "unit-1",
+    "traditional": "歡",
+    "english": "joyous (歡迎: welcome)",
+    "pinyin": "huān",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "huān",
+    "numbered": "huan1",
+    "alignment": [
+      {
+        "character": "歡",
+        "pinyin": "huān"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-28",
+    "setId": "unit-1",
+    "traditional": "迎",
+    "english": "welcome; greet",
+    "pinyin": "yíng",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "yíng",
+    "numbered": "ying2",
+    "alignment": [
+      {
+        "character": "迎",
+        "pinyin": "yíng"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-29",
+    "setId": "unit-1",
+    "traditional": "請",
+    "english": "please; invite",
+    "pinyin": "qǐng",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "qǐng",
+    "numbered": "qing3",
+    "alignment": [
+      {
+        "character": "請",
+        "pinyin": "qǐng"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-30",
+    "setId": "unit-1",
+    "traditional": "問",
+    "english": "ask",
+    "pinyin": "wèn",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "wèn",
+    "numbered": "wen4",
+    "alignment": [
+      {
+        "character": "問",
+        "pinyin": "wèn"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-31",
+    "setId": "unit-1",
+    "traditional": "的",
+    "english": "possessive particle",
+    "pinyin": "de",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "de",
+    "numbered": "de5",
+    "alignment": [
+      {
+        "character": "的",
+        "pinyin": "de"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-32",
+    "setId": "unit-1",
+    "traditional": "謝",
+    "english": "thank (謝謝: thanks)",
+    "pinyin": "xiè",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "xiè",
+    "numbered": "xie4",
+    "alignment": [
+      {
+        "character": "謝",
+        "pinyin": "xiè"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-33",
+    "setId": "unit-1",
+    "traditional": "不",
+    "english": "not; no",
+    "pinyin": "bù",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "bù",
+    "numbered": "bu4",
+    "alignment": [
+      {
+        "character": "不",
+        "pinyin": "bù"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-34",
+    "setId": "unit-1",
+    "traditional": "客",
+    "english": "guest (客氣: polite)",
+    "pinyin": "kè",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "kè",
+    "numbered": "ke4",
+    "alignment": [
+      {
+        "character": "客",
+        "pinyin": "kè"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-35",
+    "setId": "unit-1",
+    "traditional": "氣",
+    "english": "air; energy (客氣: polite)",
+    "pinyin": "qì",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "qì",
+    "numbered": "qi4",
+    "alignment": [
+      {
+        "character": "氣",
+        "pinyin": "qì"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-36",
+    "setId": "unit-1",
+    "traditional": "喝",
+    "english": "drink",
+    "pinyin": "hē",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "hē",
+    "numbered": "he1",
+    "alignment": [
+      {
+        "character": "喝",
+        "pinyin": "hē"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-37",
+    "setId": "unit-1",
+    "traditional": "茶",
+    "english": "tea",
+    "pinyin": "chá",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "chá",
+    "numbered": "cha2",
+    "alignment": [
+      {
+        "character": "茶",
+        "pinyin": "chá"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-38",
+    "setId": "unit-1",
+    "traditional": "很",
+    "english": "very",
+    "pinyin": "hěn",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "hěn",
+    "numbered": "hen3",
+    "alignment": [
+      {
+        "character": "很",
+        "pinyin": "hěn"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-39",
+    "setId": "unit-1",
+    "traditional": "什",
+    "english": "what (in 什麼)",
+    "pinyin": "shén",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "shén",
+    "numbered": "shen2",
+    "alignment": [
+      {
+        "character": "什",
+        "pinyin": "shén"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-40",
+    "setId": "unit-1",
+    "traditional": "麻",
+    "english": "hemp",
+    "pinyin": "má",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "má",
+    "numbered": "ma2",
+    "alignment": [
+      {
+        "character": "麻",
+        "pinyin": "má"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-41",
+    "setId": "unit-1",
+    "traditional": "人",
+    "english": "person",
+    "pinyin": "rén",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "rén",
+    "numbered": "ren2",
+    "alignment": [
+      {
+        "character": "人",
+        "pinyin": "rén"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-42",
+    "setId": "unit-1",
+    "traditional": "喜",
+    "english": "joy; like (喜歡)",
+    "pinyin": "xǐ",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "xǐ",
+    "numbered": "xi3",
+    "alignment": [
+      {
+        "character": "喜",
+        "pinyin": "xǐ"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-43",
+    "setId": "unit-1",
+    "traditional": "呢",
+    "english": "follow-up question particle",
+    "pinyin": "ne",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "ne",
+    "numbered": "ne5",
+    "alignment": [
+      {
+        "character": "呢",
+        "pinyin": "ne"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-44",
+    "setId": "unit-1",
+    "traditional": "他",
+    "english": "he; him",
+    "pinyin": "tā",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "tā",
+    "numbered": "ta1",
+    "alignment": [
+      {
+        "character": "他",
+        "pinyin": "tā"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-45",
+    "setId": "unit-1",
+    "traditional": "哪",
+    "english": "which; where (in 哪裡)",
+    "pinyin": "nǎ",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "nǎ",
+    "numbered": "na3",
+    "alignment": [
+      {
+        "character": "哪",
+        "pinyin": "nǎ"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-46",
+    "setId": "unit-1",
+    "traditional": "要",
+    "english": "want; need",
+    "pinyin": "yào",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "yào",
+    "numbered": "yao4",
+    "alignment": [
+      {
+        "character": "要",
+        "pinyin": "yào"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-47",
+    "setId": "unit-1",
+    "traditional": "咖",
+    "english": "coffee (in 咖啡)",
+    "pinyin": "kā",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "kā",
+    "numbered": "ka1",
+    "alignment": [
+      {
+        "character": "咖",
+        "pinyin": "kā"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-48",
+    "setId": "unit-1",
+    "traditional": "啡",
+    "english": "coffee (in 咖啡)",
+    "pinyin": "fēi",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "fēi",
+    "numbered": "fei1",
+    "alignment": [
+      {
+        "character": "啡",
+        "pinyin": "fēi"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-49",
+    "setId": "unit-1",
+    "traditional": "烏",
+    "english": "crow; black",
+    "pinyin": "wū",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "wū",
+    "numbered": "wu1",
+    "alignment": [
+      {
+        "character": "烏",
+        "pinyin": "wū"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-50",
+    "setId": "unit-1",
+    "traditional": "龍",
+    "english": "dragon",
+    "pinyin": "lóng",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "lóng",
+    "numbered": "long2",
+    "alignment": [
+      {
+        "character": "龍",
+        "pinyin": "lóng"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-51",
+    "setId": "unit-1",
+    "traditional": "日",
+    "english": "sun; day",
+    "pinyin": "rì",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "rì",
+    "numbered": "ri4",
+    "alignment": [
+      {
+        "character": "日",
+        "pinyin": "rì"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-52",
+    "setId": "unit-1",
+    "traditional": "木",
+    "english": "tree; wood",
+    "pinyin": "mù",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "mù",
+    "numbered": "mu4",
+    "alignment": [
+      {
+        "character": "木",
+        "pinyin": "mù"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-53",
+    "setId": "unit-1",
+    "traditional": "國",
+    "english": "country",
+    "pinyin": "guó",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "guó",
+    "numbered": "guo2",
+    "alignment": [
+      {
+        "character": "國",
+        "pinyin": "guó"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-54",
+    "setId": "unit-1",
+    "traditional": "對",
+    "english": "correct; towards",
+    "pinyin": "duì",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "duì",
+    "numbered": "dui4",
+    "alignment": [
+      {
+        "character": "對",
+        "pinyin": "duì"
+      }
+    ],
+    "alignmentReview": false
+  },
+  {
+    "id": "unit-1-55",
+    "setId": "unit-1",
+    "traditional": "起",
+    "english": "rise; get up",
+    "pinyin": "qǐ",
+    "notes": "",
+    "tags": [],
+    "partOfSpeech": "",
+    "exampleTraditional": "",
+    "examplePinyin": "",
+    "exampleEnglish": "",
+    "sourcePinyin": "qǐ",
+    "numbered": "qi3",
+    "alignment": [
+      {
+        "character": "起",
+        "pinyin": "qǐ"
+      }
+    ],
+    "alignmentReview": false
+  }
+]

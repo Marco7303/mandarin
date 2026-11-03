@@ -1,0 +1,38 @@
+{
+  "name": "mandarin",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --hostname 0.0.0.0",
+    "build": "next build",
+    "start": "next start --hostname 0.0.0.0",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:e2e": "pnpm build && playwright test",
+    "import:seed": "node --import tsx scripts/import-workbook.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.118.0",
+    "lucide-react": "1.67.0",
+    "next": "16.4.4",
+    "papaparse": "5.7.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "read-excel-file": "9.3.14",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.1",
+    "@types/node": "26.6.6",
+    "@types/papaparse": "5.5.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "9.39.1",
+    "eslint-config-next": "16.4.4",
+    "tsx": "4.23.15",
+    "typescript": "5.9.3",
+    "vitest": "5.1.0"
+  },
+  "packageManager": "pnpm@10.28.2"
+}
