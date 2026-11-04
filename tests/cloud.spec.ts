@@ -215,5 +215,5 @@ test('cancelling the account prompt cancels pending set creation', async ({page}
  await signIn(page,'a@example.com');
  await expect.poll(()=>fixture.libraries.get('a@example.com')?.revision).toBe(1);
  await expect(page.getByRole('dialog')).toHaveCount(0);
- await expect(page.getByRole('heading',{name:'Mandarin flashcards'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Your study space'})).toBeVisible();
 });

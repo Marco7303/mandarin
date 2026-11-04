@@ -3,7 +3,7 @@ import path from 'node:path';
 
 test('create and edit vocabulary, aligned pronunciation, independent fronts and stars',async({page})=>{
  await page.goto('/');
- await expect(page.getByRole('heading',{name:'Mandarin flashcards'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Your study space'})).toBeVisible();
  await page.getByRole('button',{name:'Create folder',exact:true}).first().click();
  await page.getByLabel('Name',{exact:true}).fill('Test folder');
  await page.getByRole('button',{name:'Create',exact:true}).click();
@@ -51,7 +51,7 @@ test('create and edit vocabulary, aligned pronunciation, independent fronts and 
 
 test('CSV and supplied workbook import through preview',async({page})=>{
  await page.goto('/');
- await page.getByRole('button',{name:'My sets',exact:false}).first().click();
+ await page.getByRole('button',{name:'All sets',exact:false}).first().click();
  await page.getByRole('button',{name:'Import',exact:true}).click();
  await page.locator('input[type=file]').setInputFiles({name:'test.csv',mimeType:'text/csv',buffer:Buffer.from('traditional,english,pinyin\n學生,student,xuéshēng\n你們,you,nǐmen')});
  await expect(page.getByText('2 words detected')).toBeVisible();
@@ -72,8 +72,19 @@ test('CSV and supplied workbook import through preview',async({page})=>{
 
 for(const viewport of [{width:390,height:844},{width:768,height:1024},{width:1440,height:900}])test(`responsive home and study ${viewport.width}`,async({page})=>{
  await page.setViewportSize(viewport);await page.goto('/');
- await expect(page.getByRole('heading',{name:'Mandarin flashcards'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Your study space'})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+ if(viewport.width>=768){
+  const library=page.getByRole('navigation',{name:'Library',exact:true});
+  await library.getByRole('button',{name:'Mandarin Class',exact:true}).click();
+  await expect(page.getByRole('heading',{name:'Mandarin Class',exact:true})).toBeVisible();
+  await expect(library.getByRole('button',{name:'Mandarin Class',exact:true})).toHaveAttribute('aria-current','page');
+  await library.getByRole('button',{name:'All sets'}).click();
+  await expect(page.getByRole('heading',{name:'All sets',exact:true})).toBeVisible();
+  await expect(library.getByRole('button',{name:'All sets'})).toHaveAttribute('aria-current','page');
+  await expect(library.getByRole('button',{name:'Mandarin Class',exact:true})).not.toHaveAttribute('aria-current','page');
+  await page.getByRole('navigation',{name:'Main navigation',exact:true}).getByRole('button',{name:'Home',exact:true}).click();
+ }
  await page.screenshot({path:`test-results/home-${viewport.width}.png`,fullPage:true});
  await page.getByRole('button',{name:'Study cards'}).click();
  await page.getByRole('button',{name:'Start studying'}).click();
@@ -95,13 +106,13 @@ test('local auth explanation, manifest and offline preservation',async({page,con
  await context.setOffline(true);
  await page.keyboard.press('Space');await page.keyboard.press('ArrowRight');
  const progress=await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state.progress);expect(Object.keys(progress).length).toBe(1);
- await page.reload();await expect(page.getByRole('heading',{name:'Mandarin flashcards'})).toBeVisible();
+ await page.reload();await expect(page.getByRole('heading',{name:'Your study space'})).toBeVisible();
  expect(await page.evaluate(()=>Object.keys(JSON.parse(localStorage.getItem('mori-v2:guest')!).state.progress).length)).toBe(1);
  await context.setOffline(false);
 });
 
 test('preview corrections and vertical import preserve user-confirmed pronunciation',async({page})=>{
- await page.goto('/');await page.getByRole('button',{name:'My sets'}).first().click();
+ await page.goto('/');await page.getByRole('button',{name:'All sets'}).first().click();
  await page.getByRole('button',{name:'Import',exact:true}).click();
  await page.getByLabel('Paste vocabulary').fill('學生\t\tbadpinyin');
  await page.getByRole('button',{name:'Preview words'}).click();
@@ -145,7 +156,7 @@ test('API refuses unauthenticated cloud access and validates dictionary input',a
 });
 
 test('mixed Learning cards choose an eligible front and keep its progress independent',async({page})=>{
- await page.goto('/');await page.getByRole('heading',{name:'Mandarin flashcards'}).waitFor();
+ await page.goto('/');await page.getByRole('heading',{name:'Your study space'}).waitFor();
  await page.evaluate(()=>{const stored=JSON.parse(localStorage.getItem('mori-v2:guest')!);const state=stored.state;state.entries=state.entries.slice(0,1);const id=state.entries[0].id;const progress={reviewCount:1,correctCount:1,incorrectCount:0,consecutiveCorrect:1,stage:1,lastResult:'know',lastReviewed:'2026-11-03T12:00:00.000Z',nextReview:'2028-11-03T12:00:00.000Z'};state.progress={[id+':chinese']:progress,[id+':english']:progress};state.preferences={prompt:'mixed',filter:'New',order:'Original',amount:'All'};localStorage.setItem('mori-v2:guest',JSON.stringify(stored))});
  await page.reload();await page.getByRole('button',{name:'Study Unit 1',exact:true}).click();
  await page.getByRole('button',{name:'Start studying'}).click();
@@ -158,7 +169,7 @@ test('mixed Learning cards choose an eligible front and keep its progress indepe
 
 test('learned cards stay done; words and sets can be reset without losing stars', async ({page}) => {
  await page.setViewportSize({width:390,height:844});
- await page.goto('/');await page.getByRole('heading',{name:'Mandarin flashcards'}).waitFor();
+ await page.goto('/');await page.getByRole('heading',{name:'Your study space'}).waitFor();
  await page.evaluate(()=>{const stored=JSON.parse(localStorage.getItem('mori-v2:guest')!);stored.state.entries=stored.state.entries.slice(0,2);stored.state.preferences={prompt:'chinese',filter:'Due',order:'Review order',amount:'All'};localStorage.setItem('mori-v2:guest',JSON.stringify(stored))});
  await page.reload();await page.getByRole('button',{name:'Study Unit 1',exact:true}).click();
  await expect(page.getByRole('button',{name:'Learning',exact:true})).toHaveClass(/selected/);
