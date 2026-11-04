@@ -4,7 +4,7 @@ const id = z.string().min(1).max(160);
 const folder = z.object({ id, name: z.string().min(1).max(200) }).passthrough();
 const set = z.object({ id, name: z.string().min(1).max(200), folderId: id }).passthrough();
 const count = z.number().int().min(0).max(100000000);
-const progress = z.object({ reviewCount: count, correctCount: count, incorrectCount: count, consecutiveCorrect: count, stage: z.number().int().min(0).max(6), lastResult: z.enum(['know', 'learning']), lastReviewed: z.iso.datetime(), nextReview: z.iso.datetime() });
+const progress = z.object({ reviewCount: count, correctCount: count, incorrectCount: count, consecutiveCorrect: count, stage: z.number().int().min(0).max(6), lastResult: z.enum(['know', 'learning']), lastReviewed: z.iso.datetime(), nextReview: z.iso.datetime().optional() });
 const promptKey = z.string().regex(/^.+:(chinese|pinyin|english)$/);
 const entry = z.object({ id, setId: id, traditional: z.string().min(1).max(1000), english: text.min(1), pinyin: text.min(1) }).passthrough();
 // Arrays and string sizes are bounded before this data reaches PostgreSQL. Additional

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { alignCharacters, normalizePinyin } from './pinyin';
-import { buildQueue, makeEntry, progressKey, schedule, searchEntry } from './core';
+import { buildQueue, makeEntry, progressKey, recordAnswer, isLearned, normalizeStudyPreferences, resetProgress, searchEntry } from './core';
 import { exportCSV, parseRows, parseText, validateEntries, preflightXlsxArchive, parseFile } from './importer';
 describe('Pinyin', () => {
     it('converts numbered, marked, neutral, ü and input alternatives', () => {
@@ -27,13 +27,35 @@ describe('Pinyin', () => {
     });
 });
 describe('progress and stars', () => {
-    it('schedules only the original direction and follows intervals', () => {
-        const now = new Date('2026-01-01T12:00:00Z');
-        const progress = { [progressKey('1', 'chinese')]: schedule(undefined, true, now) };
-        expect(progress['1:chinese'].nextReview).toBe('2026-01-03T12:00:00.000Z');
-        expect('1:english' in progress).toBe(false);
-        expect(schedule(progress['1:chinese'], true, now).nextReview).toBe('2026-01-06T12:00:00.000Z');
-        expect(schedule(progress['1:chinese'], false, now).consecutiveCorrect).toBe(0);
+    it('keeps learned cards learned regardless of elapsed time, independently by front', () => {
+        const now = new Date('2020-01-01T12:00:00Z');
+        const entry = makeEntry({ id: '1', traditional: '學生', english: 'student', pinyin: 'xuéshēng' });
+        const learned = recordAnswer(undefined, true, now);
+        const progress = { [progressKey('1', 'chinese')]: learned };
+        expect(isLearned(learned)).toBe(true);
+        expect(learned.nextReview).toBeUndefined();
+        expect(buildQueue([entry], progress, {}, { prompt: 'chinese', cards: 'learning', order: 'original', amount: 'all' })).toEqual([]);
+        expect(buildQueue([entry], progress, {}, { prompt: 'chinese', cards: 'learned', order: 'original', amount: 'all' })).toEqual([{ entryId: '1', direction: 'chinese' }]);
+        expect(buildQueue([entry], progress, {}, { prompt: 'english', cards: 'learning', order: 'original', amount: 'all' })).toEqual([{ entryId: '1', direction: 'english' }]);
+        const changed = recordAnswer(learned, false);
+        expect(isLearned(changed)).toBe(false);
+        expect(changed.reviewCount).toBe(2);
+    });
+    it('uses old answers while ignoring old review dates and includes unseen cards in Learning', () => {
+        const entries = ['known', 'learning', 'unseen'].map(id => makeEntry({ id, traditional: '你', english: 'you', pinyin: 'nǐ' }));
+        const progress = { 'known:chinese': { ...recordAnswer(undefined, true), nextReview: '2000-01-01T00:00:00.000Z' }, 'learning:chinese': { ...recordAnswer(undefined, false), nextReview: '2099-01-01T00:00:00.000Z' } };
+        const options = { prompt: 'chinese', cards: 'learning', order: 'original', amount: 'all' } as const;
+        expect(buildQueue(entries, progress, {}, options).map(p => p.entryId)).toEqual(['learning', 'unseen']);
+        expect(buildQueue(entries, progress, {}, { ...options, cards: 'all' })).toHaveLength(3);
+    });
+    it('resets only the chosen words across all fronts', () => {
+        const progress = { '1:chinese': recordAnswer(undefined, true), '1:english': recordAnswer(undefined, true), '2:chinese': recordAnswer(undefined, true) };
+        expect(Object.keys(resetProgress(progress, ['1']))).toEqual(['2:chinese']);
+        expect(Object.keys(progress)).toHaveLength(3);
+    });
+    it('replaces legacy study filters and orders without losing other preferences', () => {
+        for (const filter of ['Due', 'New', 'Difficult']) expect(normalizeStudyPreferences({ filter, order: 'Review order', prompt: 'pinyin' })).toEqual({ filter: 'Learning', order: 'Original', prompt: 'pinyin' });
+        expect(normalizeStudyPreferences({ filter: 'Learned', order: 'Random' })).toEqual({ filter: 'Learned', order: 'Random' });
     });
     it('uses the original English dimension for mixed starred study', () => {
         const e = makeEntry({ id: '1', traditional: '學生', english: 'student', pinyin: 'xuéshēng' });

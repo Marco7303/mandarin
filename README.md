@@ -29,8 +29,8 @@ Browser tests use installed Google Chrome (`channel: 'chrome'`). Install Chrome,
 - Folder/set create, rename, move, duplicate, archive, restore; multi-set and folder study.
 - Create/edit/duplicate/archive/delete words; optional notes, tags, contextual pronunciation alignment.
 - Chinese, Pinyin, English, and mixed prompts. Each word has exactly three independent progress/star dimensions. Mixed and starred are selection modes only.
-- Reveal, Know/Still learning, undo, swipe, and keyboard controls. Mistakes return once later in the session and are due tomorrow.
-- Review scheduling follows 2, 5, 14, 30, 60 days for consecutive correct answers, gradually rising to 180; `Scheduler` is replaceable.
+- Reveal, Know/Still learning, undo, swipe, and keyboard controls. Still learning keeps a card available for your next session; you can also review mistakes immediately from the results screen.
+- Cards start in Learning. Know moves the current front to Learned permanently; Still learning moves it back. Study Learning (default), Learned, All, or Starred, in Original or Random order. Progress remains separate for Chinese, Pinyin, and English. Move a word back to Learning from its word editor, or reset a whole set; vocabulary and stars are preserved. Existing answer history is retained; legacy review dates are ignored.
 - Search Chinese, English, marked/plain/numbered Pinyin, notes, and tags.
 - CSV/XLSX and pasted tabular/vertical imports with editable preview, errors, warnings, and destination selection. Source text is retained; numbered input is displayed with tone marks.
 - UTF-8 CSV exports protect formula-like values with a leading apostrophe. This safety prefix is intentionally visible on reimport; do not silently strip it.

@@ -124,10 +124,10 @@ test('preview corrections and vertical import preserve user-confirmed pronunciat
  await expect(page.getByText('men',{exact:true})).toBeVisible();
 });
 
-test('undo reverses the exact direction and removes a scheduled repeat',async({page})=>{
+test('Still learning leaves a card in Learning without extending the session, and undo restores its previous state',async({page})=>{
  await page.goto('/');await page.getByRole('button',{name:'Let’s study'}).click();
  await page.getByRole('button',{name:'Start studying'}).click();await page.keyboard.press('Space');await page.keyboard.press('ArrowLeft');
- await expect(page.locator('.session-header')).toContainText('/ 21');
+ await expect(page.locator('.session-header')).toContainText('2 / 20');
  await page.getByRole('button',{name:'Undo last answer'}).click();
  await expect(page.locator('.session-header')).toContainText('1 / 20');
  await expect(page.getByRole('button',{name:'Know',exact:true})).toBeEnabled();
@@ -142,7 +142,7 @@ test('API refuses unauthenticated cloud access and validates dictionary input',a
  const dictionary=await request.get('/api/dictionary?q=hello');expect(dictionary.status()).toBe(400);
 });
 
-test('mixed new cards choose an eligible front and keep its progress independent',async({page})=>{
+test('mixed Learning cards choose an eligible front and keep its progress independent',async({page})=>{
  await page.goto('/');await page.getByRole('heading',{name:'A little Mandarin, every day.'}).waitFor();
  await page.evaluate(()=>{const stored=JSON.parse(localStorage.getItem('mori-v2:guest')!);const state=stored.state;state.entries=state.entries.slice(0,1);const id=state.entries[0].id;const progress={reviewCount:1,correctCount:1,incorrectCount:0,consecutiveCorrect:1,stage:1,lastResult:'know',lastReviewed:'2026-11-03T12:00:00.000Z',nextReview:'2028-11-03T12:00:00.000Z'};state.progress={[id+':chinese']:progress,[id+':english']:progress};state.preferences={prompt:'mixed',filter:'New',order:'Original',amount:'All'};localStorage.setItem('mori-v2:guest',JSON.stringify(stored))});
  await page.reload();await page.getByRole('button',{name:'Study Unit 1',exact:true}).click();
@@ -151,4 +151,47 @@ test('mixed new cards choose an eligible front and keep its progress independent
  await page.keyboard.press('Space');await page.keyboard.press('ArrowRight');
  const state=await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state);const id=state.entries[0].id;
  expect(state.progress[id+':pinyin'].reviewCount).toBe(1);expect(state.progress[id+':chinese'].reviewCount).toBe(1);expect(state.progress[id+':english'].reviewCount).toBe(1);
+});
+
+
+test('learned cards stay done; words and sets can be reset without losing stars', async ({page}) => {
+ await page.setViewportSize({width:390,height:844});
+ await page.goto('/');await page.getByRole('heading',{name:'A little Mandarin, every day.'}).waitFor();
+ await page.evaluate(()=>{const stored=JSON.parse(localStorage.getItem('mori-v2:guest')!);stored.state.entries=stored.state.entries.slice(0,2);stored.state.preferences={prompt:'chinese',filter:'Due',order:'Review order',amount:'All'};localStorage.setItem('mori-v2:guest',JSON.stringify(stored))});
+ await page.reload();await page.getByRole('button',{name:'Study Unit 1',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Learning',exact:true})).toHaveClass(/selected/);
+ await expect(page.getByRole('button',{name:'Due',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Start studying'}).click();
+ await page.getByRole('button',{name:'Star prompt',exact:true}).click();
+ await page.keyboard.press('Space');await page.keyboard.press('ArrowRight');
+ await page.keyboard.press('Space');await page.keyboard.press('ArrowLeft');
+ await expect(page.getByRole('heading',{name:'Look at you grow.'})).toBeVisible();
+ await page.getByRole('button',{name:'Done',exact:true}).click();
+ await page.reload();await page.getByRole('button',{name:'Study Unit 1',exact:true}).click();
+ await page.getByRole('button',{name:'Start studying'}).click();
+ await expect(page.locator('.session-header')).toContainText('1 / 1');
+ await page.keyboard.press('Space');await page.keyboard.press('ArrowRight');
+ await page.getByRole('button',{name:'Done',exact:true}).click();
+ await page.getByRole('button',{name:'Study Unit 1',exact:true}).click();
+ await page.getByRole('button',{name:'Start studying'}).click();
+ await expect(page.getByRole('status')).toContainText('All learned for this front!');
+ await page.getByRole('button',{name:'Learned',exact:true}).click();
+ await page.getByRole('button',{name:'Start studying'}).click();
+ await expect(page.locator('.session-header')).toContainText('1 / 2');
+ // Undo restores Learned after practising a learned card as Still learning.
+ await page.keyboard.press('Space');await page.keyboard.press('ArrowLeft');
+ await page.getByRole('button',{name:'Undo last answer'}).click();
+ expect(await page.evaluate(()=>Object.values(JSON.parse(localStorage.getItem('mori-v2:guest')!).state.progress).every((p)=> (p as {lastResult:string}).lastResult==='know'))).toBe(true);
+ page.on('dialog',dialog=>dialog.accept());
+ await page.getByRole('button',{name:'End session'}).click();
+ await page.locator('.set-open').first().click();
+ await page.getByRole('button',{name:/^Edit /}).first().click();
+ await page.getByRole('button',{name:'Move back to Learning',exact:true}).click();
+ await expect(page.getByText('Learning in all fronts.',{exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Close dialog'}).click();
+ expect(await page.evaluate(()=>Object.keys(JSON.parse(localStorage.getItem('mori-v2:guest')!).state.progress).length)).toBe(1);
+ await page.getByRole('button',{name:'Reset progress',exact:true}).click();
+ const state=await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state);
+ expect(Object.keys(state.progress)).toHaveLength(0);expect(state.entries).toHaveLength(2);expect(Object.values(state.stars)).toContain(true);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });

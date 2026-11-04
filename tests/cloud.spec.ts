@@ -150,3 +150,34 @@ for (const keepDevice of [true, false]) test(`cloud conflict can ${keepDevice ? 
     expect(stored.state.stars['unit-1-1:english']).toBe(keepDevice ? undefined : true);
     expect(fixture.libraries.get('a@example.com')!.revision).toBe(keepDevice ? 3 : 2);
 });
+
+test('legacy cloud progress becomes Learning and Learned, and reset syncs without deleting vocabulary or stars', async ({page}) => {
+    const fixture = await installCloudFixture(page);
+    await page.goto('/'); await signIn(page, 'a@example.com');
+    await expect.poll(() => fixture.libraries.get('a@example.com')?.revision).toBe(1);
+    const cloud = fixture.libraries.get('a@example.com')!;
+    const entries = (cloud.state.entries as {id:string}[]).slice(0,2);
+    const known = { reviewCount:1, correctCount:1, incorrectCount:0, consecutiveCorrect:1, stage:1, lastResult:'know', lastReviewed:'2020-01-01T00:00:00.000Z', nextReview:'2020-01-03T00:00:00.000Z' };
+    cloud.state.entries = entries;
+    cloud.state.progress = { [entries[0].id+':chinese']: known };
+    cloud.state.stars = { [entries[0].id+':chinese']: true };
+    cloud.state.preferences = { prompt:'chinese', filter:'Due', order:'Review order', amount:'All' };
+    cloud.revision++;
+    await page.reload();
+    await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('mori-v2:a@example.com')!).baseRevision)).toBe(2);
+    await page.getByRole('button',{name:'Study Unit 1',exact:true}).click();
+    await expect(page.getByRole('button',{name:'Learning',exact:true})).toHaveClass(/selected/);
+    await page.getByRole('button',{name:'Start studying'}).click();
+    await expect(page.locator('.session-header')).toContainText('1 / 1');
+    await page.keyboard.press('Space'); await page.keyboard.press('ArrowRight');
+    await expect.poll(() => (fixture.libraries.get('a@example.com')!.state.progress as Record<string,{lastResult:string}>)[entries[1].id+':chinese']?.lastResult).toBe('know');
+    expect((fixture.libraries.get('a@example.com')!.state.progress as Record<string,object>)[entries[1].id+':chinese']).not.toHaveProperty('nextReview');
+    await page.getByRole('button',{name:'Done',exact:true}).click();
+    await page.locator('.set-open').first().click();
+    page.once('dialog',dialog=>dialog.accept());
+    await page.getByRole('button',{name:'Reset progress',exact:true}).click();
+    await expect.poll(() => Object.keys(fixture.libraries.get('a@example.com')!.state.progress as object).length).toBe(0);
+    expect(fixture.libraries.get('a@example.com')!.state.entries).toHaveLength(2);
+    expect(fixture.libraries.get('a@example.com')!.state.stars).toEqual({ [entries[0].id+':chinese']: true });
+    expect(fixture.unexpected).toEqual([]);
+});

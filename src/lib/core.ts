@@ -30,7 +30,8 @@ export type Progress = {
     stage: number;
     lastResult: 'know' | 'learning';
     lastReviewed: string;
-    nextReview: string;
+    /** Legacy review date, preserved when loading older libraries; no longer used. */
+    nextReview?: string;
 };
 export type ProgressMap = Record<string, Progress>;
 export type StarMap = Record<string, boolean>;
@@ -44,48 +45,47 @@ export function searchEntry(entry: Entry, query: string) {
     const plain = plainPinyin(query);
     return haystack.includes(query.toLowerCase()) || (!!plain && plainPinyin(entry.pinyin).includes(plain));
 }
-export interface Scheduler {
-    review(previous: Progress | undefined, result: 'know' | 'learning', now?: Date): Progress;
-}
-export function schedule(previous: Progress | undefined, answer: 'know' | 'learning' | boolean, now = new Date()): Progress {
+/** A card stays learned until the user changes it or resets its progress. */
+export function recordAnswer(previous: Progress | undefined, answer: 'know' | 'learning' | boolean, now = new Date()): Progress {
     const result = typeof answer === 'boolean' ? (answer ? 'know' : 'learning') : answer;
     const consecutiveCorrect = result === 'know' ? (previous?.consecutiveCorrect ?? 0) + 1 : 0;
-    const intervals = [1, 2, 5, 14, 30, 60];
-    const days = result === 'learning' ? 1 : intervals[consecutiveCorrect] ?? Math.min(180, 60 + (consecutiveCorrect - 5) * 30);
-    const next = new Date(now);
-    next.setDate(next.getDate() + days);
-    return { reviewCount: (previous?.reviewCount ?? 0) + 1, correctCount: (previous?.correctCount ?? 0) + (result === 'know' ? 1 : 0), incorrectCount: (previous?.incorrectCount ?? 0) + (result === 'learning' ? 1 : 0), consecutiveCorrect, stage: Math.min(6, consecutiveCorrect), lastResult: result, lastReviewed: now.toISOString(), nextReview: next.toISOString() };
+    return { reviewCount: (previous?.reviewCount ?? 0) + 1, correctCount: (previous?.correctCount ?? 0) + (result === 'know' ? 1 : 0), incorrectCount: (previous?.incorrectCount ?? 0) + (result === 'learning' ? 1 : 0), consecutiveCorrect, stage: Math.min(6, consecutiveCorrect), lastResult: result, lastReviewed: now.toISOString() };
 }
-export const defaultScheduler: Scheduler = { review: schedule };
+export function isLearned(progress: Progress | undefined) { return progress?.lastResult === 'know'; }
+export function resetProgress(progress: ProgressMap, entryIds: string[]): ProgressMap {
+    const ids = new Set(entryIds);
+    return Object.fromEntries(Object.entries(progress).filter(([key]) => !ids.has(key.slice(0, key.lastIndexOf(':')))));
+}
+export function normalizeStudyPreferences<T extends { filter: string; order: string }>(preferences: T): T {
+    return { ...preferences,
+        filter: ['Learning', 'Learned', 'All', 'Starred'].includes(preferences.filter) ? preferences.filter : 'Learning',
+        order: preferences.order === 'Random' ? 'Random' : 'Original',
+    };
+}
 export type Prompt = {
     entryId: string;
     direction: Direction;
 };
 export type StudyOptions = {
     prompt: Direction | 'mixed';
-    cards: 'all' | 'due' | 'new' | 'difficult' | 'starred';
-    order: 'review' | 'random' | 'original' | 'difficult' | 'new';
+    cards: 'all' | 'learning' | 'learned' | 'starred';
+    order: 'random' | 'original';
     amount: number | 'all';
 };
-export function buildQueue(entries: Entry[], progress: ProgressMap, stars: StarMap, options: StudyOptions, now = new Date()): Prompt[] {
+export function buildQueue(entries: Entry[], progress: ProgressMap, stars: StarMap, options: StudyOptions): Prompt[] {
     let queue: Prompt[] = [];
     for (const entry of entries.filter(e => !e.archived)) {
         const choices = options.prompt === 'mixed' ? directions : [options.prompt];
         const eligible = choices.filter(direction => {
-            const key = progressKey(entry.id, direction), p = progress[key];
-            return options.cards === 'all' || (options.cards === 'new' && !p) || (options.cards === 'due' && (!p || p.nextReview <= now.toISOString())) || (options.cards === 'difficult' && !!p && (p.lastResult === 'learning' || p.incorrectCount > p.correctCount)) || (options.cards === 'starred' && stars[key]);
+            const key = progressKey(entry.id, direction);
+            return options.cards === 'all' || (options.cards === 'learning' && !isLearned(progress[key])) || (options.cards === 'learned' && isLearned(progress[key])) || (options.cards === 'starred' && stars[key]);
         });
-        if (eligible.length)
-            queue.push({ entryId: entry.id, direction: eligible[Math.floor(Math.random() * eligible.length)] });
+        // Starred mixed sessions include each explicitly starred front.
+        const selected = options.prompt === 'mixed' && options.cards !== 'starred' && eligible.length
+            ? [eligible[Math.floor(Math.random() * eligible.length)]] : eligible;
+        queue.push(...selected.map(direction => ({ entryId: entry.id, direction })));
     }
-    const score = (p: Prompt) => progress[progressKey(p.entryId, p.direction)];
     if (options.order === 'random')
         queue = queue.map(p => ({ p, r: Math.random() })).sort((a, b) => a.r - b.r).map(x => x.p);
-    else if (options.order === 'review')
-        queue.sort((a, b) => (score(a)?.nextReview ?? '').localeCompare(score(b)?.nextReview ?? ''));
-    else if (options.order === 'difficult')
-        queue.sort((a, b) => (score(b)?.incorrectCount ?? 0) - (score(a)?.incorrectCount ?? 0));
-    else if (options.order === 'new')
-        queue.sort((a, b) => Number(!!score(a)) - Number(!!score(b)));
     return options.amount === 'all' ? queue : queue.slice(0, options.amount);
 }
