@@ -4,7 +4,7 @@ import { ArrowDownToLine, ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, C
 import seed from '@/data/unit1.json';
 import { makeEntry, schedule, searchEntry, type Entry, type Direction, type Progress } from '@/lib/core';
 import { parseFile, parseText, exportCSV, validateEntries, type ImportResult } from '@/lib/importer';
-import { getClient, getCloudRevision, loadCloud, saveCloud, signIn, signUp, signOut } from '@/lib/cloud';
+import { getClient, getSession, onAuthStateChange, getCloudRevision, loadCloud, saveCloud, signIn, signUp, signOut } from '@/lib/cloud';
 type Folder = {
     id: string;
     name: string;
@@ -107,7 +107,7 @@ export default function MandarinApp() {
         syncReady.current = false;
         syncing.current = false;
         setSyncConflict(null);
-        let state = initialState, pending = false, baseRevision: number | null = null;
+        let state: State = { ...initialState }, pending = false, baseRevision: number | null = null;
         try {
             const saved = localStorage.getItem(`mori-v2:${owner}`);
             const legacy = owner === 'guest' ? localStorage.getItem('mori-v1') : null;
@@ -134,8 +134,7 @@ export default function MandarinApp() {
         return state;
     }, []);
     useEffect(() => { let cancelled = false; const initialize = async () => { try {
-        const client = getClient();
-        const session = client ? (await client.auth.getSession()).data.session : null;
+        const session = await getSession();
         if (cancelled)
             return;
         const cached = !navigator.onLine ? JSON.parse(localStorage.getItem('mori-last-owner') || 'null') : null;
@@ -170,11 +169,13 @@ export default function MandarinApp() {
     useEffect(() => { if (!toast)
         return; const timer = setTimeout(() => setToast(''), 3500); return () => clearTimeout(timer); }, [toast]);
     const connectCloud = useCallback(async () => {
+        let token = generation.current;
         try {
             const client = getClient();
             if (!client)
                 return;
-            const { data: { session } } = await client.auth.getSession();
+            const session = await getSession();
+            if (token !== generation.current) return;
             if (!session && !navigator.onLine) {
                 setSyncStatus('Saved locally · sync pending');
                 return;
@@ -196,7 +197,7 @@ export default function MandarinApp() {
                 setSyncStatus('Saved on this device');
                 return;
             }
-            const token = generation.current;
+            token = generation.current;
             setSyncStatus('Syncing…');
             const remote = await loadCloud(owner);
             if (token !== generation.current)
@@ -229,13 +230,14 @@ export default function MandarinApp() {
             setSyncTick(n => n + 1);
         }
         catch (e) {
+            if (token !== generation.current) return;
             syncReady.current = false;
             setSyncStatus('Saved locally · sync pending');
             setToast(e instanceof Error ? e.message : 'Could not sync');
         }
     }, [persistLocal, switchLibrary]);
     useEffect(() => { if (!ready)
-        return; const client = getClient(); const sub = client?.auth.onAuthStateChange((event, session) => { if (event === 'SIGNED_OUT') {
+        return; const unsubscribe = onAuthStateChange((event, session) => { if (event === 'SIGNED_OUT') {
         try {
             localStorage.removeItem('mori-last-owner');
         }
@@ -245,9 +247,9 @@ export default function MandarinApp() {
         setSyncStatus('Saved on this device');
     }
     else if (event === 'SIGNED_IN' && session)
-        setTimeout(() => void connectCloud(), 0); }); return () => sub?.data.subscription.unsubscribe(); }, [ready, connectCloud, switchLibrary]);
+        setTimeout(() => void connectCloud(), 0); }); return unsubscribe; }, [ready, connectCloud, switchLibrary]);
     useEffect(() => { if (ready && online)
-        void connectCloud(); }, [ready, online, connectCloud]);
+        void connectCloud(); const refresh = () => { if (navigator.onLine) void connectCloud(); }; window.addEventListener('focus', refresh); return () => window.removeEventListener('focus', refresh); }, [ready, online, connectCloud]);
     useEffect(() => {
         if (!ready || !email || !online || !syncReady.current || syncConflict)
             return;
@@ -470,9 +472,9 @@ export default function MandarinApp() {
       <div className="answer-actions"><button className="button learning" disabled={!revealed} onClick={() => answer(false)}><ArrowLeft size={18}/>Still learning</button><button className="button primary" disabled={!revealed} onClick={() => answer(true)}>Know <Check size={20}/></button></div><p className="session-hint">{revealed ? 'A little honesty helps a lot.' : 'Take a breath. What comes to mind?'}</p></div>}
       {screen === 'result' && <div className="result"><div className="result-seal"><Check size={37}/></div><span className="eyebrow">ONE STEP FURTHER</span><h1>Look at you grow<span className="accent">.</span></h1><p>A little practice goes a long way.</p><div className="result-stats"><div><strong>{sessionTotal}</strong><span>Reviewed</span></div><div><strong>{answers.filter(a => a.correct && !a.prompt.repeat).length}</strong><span>Known</span></div><div><strong>{answers.filter(a => !a.correct && !a.prompt.repeat).length}</strong><span>Still learning</span></div></div>{answers.some(a => !a.correct) && <button className="button secondary full" onClick={() => startSession(answers.filter(a => !a.correct && !a.prompt.repeat).map(a => ({ ...a.prompt, repeat: false })))}><RotateCcw size={18}/>Review mistakes</button>}<button className="button primary full" onClick={() => navigate('home')}>Done <ArrowRight size={18}/></button><button className="text-button" onClick={undo}>Undo last answer</button></div>}
       {screen === 'settings' && <><div className="page-heading"><div><div className="eyebrow">YOUR SPACE</div><h1>Keep it simple<span className="accent">.</span></h1><p>A few things behind the scenes.</p></div></div><div className="settings-content"><section className="settings-section"><h2>Account & sync</h2><div className="settings-row"><div><strong>{email || 'Your progress, wherever you are'}</strong><p>{email ? syncStatus : 'Sign in to sync across your devices.'}</p></div><button className="button secondary" onClick={() => { if (email)
-            void signOut().then(() => notify('Signed out'));
+            void signOut().then(() => notify('Signed out')).catch(error => notify(error instanceof Error ? error.message : 'Could not sign out'));
         else
-            setModal('auth'); }}>{email ? 'Sign out' : 'Sign in'}</button></div>{!getClient() && <p className="settings-note">Local mode is ready. Add Supabase keys to enable account sync.</p>}{email && !syncConflict && <button className="text-button" onClick={() => void connectCloud()}>Sync now</button>}{syncConflict && <div role="alert"><p className="settings-note">This device and the cloud both changed. Export your words before replacing either copy.</p><div className="heading-actions"><button className="button secondary" onClick={() => void resolveSync(true)}>Keep this device</button><button className="button secondary" onClick={() => void resolveSync(false)}>Use cloud copy</button></div></div>}</section><section className="settings-section"><h2>Your vocabulary</h2><div className="settings-row"><div><strong>Keep a copy</strong><p>All your words, in a reusable CSV file.</p></div><button className="button secondary" onClick={() => exportEntries(entries, 'mori-vocabulary')}><ArrowDownToLine size={17}/>Export all</button></div><div className="settings-row"><div><strong>Bring your words</strong><p>Import a spreadsheet or paste a list.</p></div><button className="button secondary" onClick={() => { setImportResult(null); setModal('import'); }}><Upload size={17}/>Import</button></div></section><section className="settings-section"><h2>Install Mori</h2><p className="settings-note">In your browser menu, choose “Install app” or “Add to Home Screen”. Open Mori once online to keep studying offline.</p></section><section className="settings-section credits"><h2>Made for a little, every day.</h2><p>Taiwanese Mandarin · Traditional Chinese</p><p>Chinese typeface: 教育部標準楷書 · 中華民國教育部<br />CC BY-ND 3.0 TW. Font redistributed unchanged.</p><a href="https://cc-cedict.org/" target="_blank" rel="noreferrer">CC-CEDICT attribution <ArrowRight size={14}/></a><a href="https://creativecommons.org/licenses/by-nd/3.0/tw/" target="_blank" rel="noreferrer">Font licence <ArrowRight size={14}/></a><p>Optional dictionary: CC-CEDICT · CC BY-SA 4.0. Suggestions appear in the word editor when a local corpus is configured.</p></section></div></>}
+            setModal('auth'); }}>{email ? 'Sign out' : 'Sign in'}</button></div>{!getClient() && <p className="settings-note">Local mode is ready. Add Stack Auth keys to enable account sync.</p>}{email && !syncConflict && <button className="text-button" onClick={() => void connectCloud()}>Sync now</button>}{syncConflict && <div role="alert"><p className="settings-note">This device and the cloud both changed. Export your words before replacing either copy.</p><div className="heading-actions"><button className="button secondary" onClick={() => void resolveSync(true)}>Keep this device</button><button className="button secondary" onClick={() => void resolveSync(false)}>Use cloud copy</button></div></div>}</section><section className="settings-section"><h2>Your vocabulary</h2><div className="settings-row"><div><strong>Keep a copy</strong><p>All your words, in a reusable CSV file.</p></div><button className="button secondary" onClick={() => exportEntries(entries, 'mori-vocabulary')}><ArrowDownToLine size={17}/>Export all</button></div><div className="settings-row"><div><strong>Bring your words</strong><p>Import a spreadsheet or paste a list.</p></div><button className="button secondary" onClick={() => { setImportResult(null); setModal('import'); }}><Upload size={17}/>Import</button></div></section><section className="settings-section"><h2>Install Mori</h2><p className="settings-note">In your browser menu, choose “Install app” or “Add to Home Screen”. Open Mori once online to keep studying offline.</p></section><section className="settings-section credits"><h2>Made for a little, every day.</h2><p>Taiwanese Mandarin · Traditional Chinese</p><p>Chinese typeface: 教育部標準楷書 · 中華民國教育部<br />CC BY-ND 3.0 TW. Font redistributed unchanged.</p><a href="https://cc-cedict.org/" target="_blank" rel="noreferrer">CC-CEDICT attribution <ArrowRight size={14}/></a><a href="https://creativecommons.org/licenses/by-nd/3.0/tw/" target="_blank" rel="noreferrer">Font licence <ArrowRight size={14}/></a><p>Optional dictionary: CC-CEDICT · CC BY-SA 4.0. Suggestions appear in the word editor when a local corpus is configured.</p></section></div></>}
       </>}
       </main>
       {!isStudy && <nav className="bottom-nav" aria-label="Mobile navigation">{([{ id: 'home', label: 'Home', icon: Home }, { id: 'sets', label: 'Sets', icon: BookOpen }, { id: 'setup', label: 'Study', icon: Sparkles }, { id: 'settings', label: 'Settings', icon: Settings }] as const).map(item => <button key={item.id} className={cn((screen === item.id || (screen === 'detail' && item.id === 'sets')) && 'active')} onClick={() => item.id === 'setup' ? setup(activeSets.map(s => s.id)) : navigate(item.id)}><item.icon size={21}/><span>{item.label}</span></button>)}</nav>}
@@ -507,7 +509,7 @@ export default function MandarinApp() {
             toggleStar(editing, d); }} onSave={entry => { update(d => ({ ...d, entries: editing ? d.entries.map(x => x.id === editing ? entry : x) : [...d.entries, entry] })); closeModal(); notify('Word saved'); }} setId={activeSet?.id || data.sets[0]?.id} onArchive={() => { update(d => ({ ...d, entries: d.entries.map(x => x.id === editing ? { ...x, archived: true } : x) })); closeModal(); notify('Word archived'); }} onDuplicate={() => { const e = data.entries.find(e => e.id === editing); if (e)
             update(d => ({ ...d, entries: [...d.entries, { ...e, id: uid() }] })); closeModal(); notify('Word duplicated'); }} onDelete={() => { if (!window.confirm('Delete this word permanently?'))
             return; update(d => ({ ...d, entries: d.entries.filter(e => e.id !== editing), progress: Object.fromEntries(Object.entries(d.progress).filter(([k]) => !k.startsWith(`${editing}:`))), stars: Object.fromEntries(Object.entries(d.stars).filter(([k]) => !k.startsWith(`${editing}:`))) })); closeModal(); notify('Word deleted'); }}/>}
-      {modal === 'auth' && <><p className="modal-intro">Your words. Your progress. On every device.</p>{!getClient() ? <div className="local-mode"><Cloud size={28}/><h3>You’re learning locally</h3><p>Your progress is saved in this browser. Connect Supabase in the environment to enable sign in.</p><button className="button primary full" onClick={closeModal}>Keep learning <ArrowRight size={18}/></button></div> : <form onSubmit={async (e) => { e.preventDefault(); setAuthBusy(true); setAuthError(''); const form = new FormData(e.currentTarget); try {
+      {modal === 'auth' && <><p className="modal-intro">Your words. Your progress. On every device.</p>{!getClient() ? <div className="local-mode"><Cloud size={28}/><h3>You’re learning locally</h3><p>Your progress is saved in this browser. Connect Stack Auth in the environment to enable sign in.</p><button className="button primary full" onClick={closeModal}>Keep learning <ArrowRight size={18}/></button></div> : <form onSubmit={async (e) => { e.preventDefault(); setAuthBusy(true); setAuthError(''); const form = new FormData(e.currentTarget); try {
             const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement;
             const action = submitter?.value === 'signup' ? signUp : signIn;
             const result = await action(String(form.get('email')), String(form.get('password')));

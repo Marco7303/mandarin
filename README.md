@@ -1,17 +1,17 @@
 # Mori 森
 
-A calm, mobile-first Taiwanese Mandarin flashcard app. Next.js App Router, React, TypeScript, Supabase Auth/PostgreSQL, and plain responsive CSS. No audio, stroke order, or response-time tracking.
+A calm, mobile-first Taiwanese Mandarin flashcard app. Next.js App Router, React, TypeScript, Stack Auth, Prisma ORM/Postgres, and plain responsive CSS. No audio, stroke order, or response-time tracking.
 
 ## Run
 
-Node 22+ and pnpm 10+ recommended.
+Node 22.12+ (or Node 24+) and pnpm 10+ recommended.
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-Open http://localhost:3000. The app works immediately in local mode with **Mandarin Class → Unit 1**, imported from the supplied workbook. Browser storage preserves vocabulary, preferences, direction-specific stars, and review results. Local mode is not a simulated sign-in; cloud accounts require Supabase configuration.
+Open http://localhost:3000. The app works immediately in local mode with **Mandarin Class → Unit 1**, imported from the supplied workbook. Browser storage preserves vocabulary, preferences, direction-specific stars, and review results. Local mode is not a simulated sign-in; cloud accounts require Stack Auth and Prisma Postgres configuration.
 
 ```sh
 pnpm test
@@ -22,7 +22,7 @@ pnpm start
 pnpm test:e2e
 ```
 
-Browser tests use installed Google Chrome (`channel: 'chrome'`). Install Chrome, or remove `channel` from `playwright.config.ts` and run `pnpm exec playwright install chromium`. `pnpm test:e2e` builds and tests the production server, including offline reload; the test server reuses port 3000 when available. Stop a development server before launching a production server on that port.
+Browser tests use installed Google Chrome (`channel: 'chrome'`). Install Chrome, or remove `channel` from `playwright.config.ts` and run `pnpm exec playwright install chromium`. `pnpm test:e2e` builds and tests the production server, including offline reload; the test server requires port 3000 to be free. Stop a development server before launching a production server on that port.
 
 ## Features
 
@@ -50,22 +50,40 @@ Regenerates `src/data/unit1.json` and `src/data/import-report.json` from the rea
 
 Full unchanged **EduKai 5.1**, supplied by the user, is served at `/fonts/edukai.ttf`. The embedded font metadata and official Taiwan Ministry of Education licence permit unchanged redistribution with attribution. Chinese content uses `lang="zh-Hant-TW"`; UI/Pinyin/English use Avenir Next with sans-serif fallbacks. Font size is approximately 15.8 MB because the licence prohibits modified derivatives; it is not subsetted. See [FONT-LICENSE.md](FONT-LICENSE.md). Attribution: **中華民國教育部**, CC BY-ND 3.0 TW. The original input file remains untouched.
 
-## Supabase and Vercel
+## Stack Auth, Prisma Postgres, and Vercel
 
-1. Create a Supabase project. Enable email/password authentication.
-2. Run `supabase/migrations/202611030001_library.sql` in its SQL editor, or link the Supabase CLI and run `supabase db push`.
-3. Copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`. No service-role key is used.
-4. Set Supabase Auth Site URL/allowed redirects to your local/deployed URL. Confirm account email when required.
-5. In Vercel import this **mandarin directory** as the project root. Framework: Next.js; install `pnpm install --frozen-lockfile`; build `pnpm build`. Add the same two environment values and deploy.
-6. Use two test accounts to verify ownership isolation and the RLS checks listed in [supabase/README.md](supabase/README.md).
+**No accounts or environment variables are needed to use Mori locally.** The Excel workbook is already bundled as the starter library. To enable sign-in and phone/laptop sync, set up two hosted services once:
 
-A single owner-protected JSONB snapshot makes library sync atomic. Server Zod validation checks collection limits, direction keys, counters, references, and IDs. Auth tokens are verified on the server; RLS applies to every database operation. Optimistic revisions prevent silent overwrites from concurrent devices. Full snapshot sync is deliberate for this MVP, not an unlimited-scale normalized vocabulary database.
+1. Create a **Stack Auth** project, enable email/password authentication, and allow `http://localhost:3000` plus your deployed Vercel origin in its domains/redirect settings. Copy the project ID and secret server key. A publishable client key is only needed if the project requires one. The current official Stack Auth site/docs redirect to Hexclave; this app pins the published `@stackframe/stack` SDK and uses its custom-form APIs.
+2. Create a **Prisma Postgres** database, either in Prisma Console or through the Vercel Marketplace. Copy its standard pooled PostgreSQL connection URL (`postgres://…` or `postgresql://…`), not a `prisma+postgres://` Accelerate URL.
+3. Copy `.env.example` to `.env.local` and fill in:
 
-Local libraries are separated by authenticated user ID, with a separate guest library. Signing out returns to the guest library; signing in to another account loads that account's local/cloud copy. Guest vocabulary is not automatically uploaded into an account: export and import it when you want to move it. Cached account libraries remain on this browser until site data is cleared, so shared-device users should clear site data after signing out.
+   ```dotenv
+   NEXT_PUBLIC_HEXCLAVE_PROJECT_ID=...
+   HEXCLAVE_SECRET_SERVER_KEY=...
+   DATABASE_URL=postgresql://...
+   ```
 
-Pending changes and their last cloud revision are persisted locally. Reloading while offline does not replace unsynced answers with an older cloud copy. Reconnection retries sync. If both copies changed, Settings offers **Keep this device** or **Use cloud copy**; neither copy is automatically merged. Export vocabulary before choosing because CSV contains words, not progress. Failed transport pauses sync without repeated background requests; **Sync now** in Settings retries. Keep one Mori tab open per account when editing, since live cross-tab local reconciliation is not implemented.
+   Legacy `NEXT_PUBLIC_STACK_PROJECT_ID`, `NEXT_PUBLIC_STACK_PUBLISHABLE_CLIENT_KEY`, and `STACK_SECRET_SERVER_KEY` names also work. If required, set `NEXT_PUBLIC_HEXCLAVE_PUBLISHABLE_CLIENT_KEY`. Keep the secret key and database URL server-only. An optional `DIRECT_DATABASE_URL` can be used for CLI migrations; otherwise the CLI uses `DATABASE_URL`. Prisma CLI reads `.env.local`, then `.env`, without overwriting existing process variables.
+4. Run `pnpm db:migrate` once to create the database table. `pnpm db:validate` checks the schema. Client generation runs on dependency installation and every build. Restart `pnpm dev` after changing keys.
+5. In Vercel, use **mandarin** as the root directory, Next.js as framework, `pnpm install --frozen-lockfile` for install, and `pnpm build` for build. Add the same environment values. Public Stack keys are compiled into the browser bundle, so changing them requires rebuilding. Run `pnpm db:migrate` against the production database before the first deployment and whenever a new migration is added. Use separate projects/databases for preview deployments if previews should not access production data.
+6. Create an account using Mori's existing email/password form. Stack handles email verification on its hosted verification page; return to Mori and sign in afterward if verification is required. Each new account receives the **55 Excel words**, then its library syncs automatically. There is no global/shared user seed and nothing to seed in SQL.
 
-Live email delivery, Auth, database migration execution, and cross-account RLS require a real project and were **not verified without credentials**. Local tests do not substitute for those deployment checks.
+The browser interface, layouts, study behavior, imports, and local storage keys are preserved. No Stack provider UI or stylesheet is mounted. The only visible text updates replace the previous provider name in local setup hints.
+
+A single JSONB snapshot per verified Stack user keeps library sync atomic. Every API call verifies the Stack session on the server, and every database query is scoped to that verified ID. A body-supplied owner is ignored. A request-owner check cancels requests if accounts change while a token is acquired. Database credentials are never sent to the browser. Unlike Supabase, this setup uses server-side ownership checks rather than Supabase RLS or an `auth.users` foreign key.
+
+Prisma schema and versioned SQL migrations live in the repo; the writable production database lives in Prisma Postgres. A reused Prisma client and small `pg` pool suit warm Vercel functions. The runtime accepts standard PostgreSQL URLs and uses the Prisma `pg` adapter. Prisma 7 is pinned to its supported stable release rather than the Prisma 8 release candidate.
+
+Server Zod validation checks collection limits, direction keys, counters, references, and IDs. Each save performs one parameterized atomic compare-and-swap: a null revision can only create a library, and a numbered revision can only update that exact existing version. Competing writes return HTTP 409 instead of overwriting another device. Database/provider outages return retryable errors without exposing credentials. Full snapshot sync is deliberate for this MVP.
+
+Local libraries remain separated by authenticated user ID, with a separate guest library. Signing out returns to the guest library; signing in to another account loads that account's local/cloud copy. Guest vocabulary is not automatically uploaded into an account: export and import it when you want to move it. Cached account libraries remain on this browser until site data is cleared.
+
+Pending changes and their last cloud revision are persisted locally. Reloading offline does not replace unsynced answers with an older cloud copy. Reconnection retries sync. If both copies changed, Settings offers **Keep this device** or **Use cloud copy**; neither copy is automatically merged. Export vocabulary before choosing because CSV contains words, not progress. Failed transport pauses sync; **Sync now** retries. Keep one Mori tab open per account when editing, since live cross-tab local reconciliation is not implemented. Returning focus reconciles the signed-in account.
+
+Existing guest libraries and bundled Excel vocabulary are retained. Prior Supabase account IDs and Stack account IDs are different; this refactor does not automatically reassign or transfer a deployed Supabase account's cloud data. No deployed Supabase data was supplied for migration.
+
+Live email delivery and the actual hosted Stack Auth/Prisma Postgres connection still require your project configuration. Tests use SDK HTTP fixtures and an isolated local PostgreSQL engine; they do not claim to verify your hosted accounts. See [backend setup and verification](docs/backend.md).
 
 ## Optional dictionary
 
@@ -75,11 +93,12 @@ Dictionary attribution: [CC-CEDICT](https://cc-cedict.org/), [CC BY-SA 4.0](http
 
 ## Limits
 
-Cloud setup needs your Supabase project. No automatic cross-device conflict merge, background sync while the app is closed, account recovery UI, or OAuth. A sync conflict preserves the device copy for export. Local browser storage is not encrypted backup and can be removed by clearing site data. Optional CC-CEDICT is exact-match, server-side, and must be supplied separately. The supplied font's full-file size makes the first offline cache download larger. Pinyin alignment is deterministic, with uncertain cases flagged for manual review; it cannot infer contextual pronunciation from unmarked text. The app is ready for Vercel setup; it has not been published to a hosting account.
+Cloud setup needs your Stack Auth project and Prisma Postgres database. No automatic cross-device conflict merge, background sync while the app is closed, account recovery UI, or OAuth. A sync conflict preserves the device copy for export. Local browser storage is not encrypted backup and can be removed by clearing site data. Optional CC-CEDICT is exact-match, server-side, and must be supplied separately. The supplied font's full-file size makes the first offline cache download larger. Pinyin alignment is deterministic, with uncertain cases flagged for manual review; it cannot infer contextual pronunciation from unmarked text. The app is ready for Vercel setup; it has not been published to a hosting account.
 
 ## Verification — 3 November 2026
 
-- **23/23 unit tests:** Pinyin/neutral tones/ü, contextual character alignment, scheduling, independent progress/star keys, tabular/vertical imports, editable preview validation, ZIP safety, safe CSV round trips, dictionary parsing, cloud validation, and real workbook.
-- **10/10 Playwright tests** in Chrome against the production server: folder/set/word creation, manual pronunciation persistence, independent Chinese/English reviews, English-only stars, starred study, eligible mixed fronts, undo/repeats, CSV/XLSX/vertical imports, corrected import errors, PWA manifest/offline reload with persisted progress, API access rejection, and responsive home/study screens at 390×844, 768×1024, and 1440×900.
-- `pnpm typecheck`, `pnpm lint`, and `pnpm build` all pass.
-- Live Supabase sign-in/email delivery/migration/RLS tests and actual device installation remain deployment checks requiring your account and devices. No hosting deployment was performed.
+- **70 unit/integration tests** cover the original learning/import behavior, Stack Auth client adapter, account-scoped API access, invalid/oversized payloads, provider/database failures, and PostgreSQL persistence through the real Prisma client/pg adapter. Database tests run the actual migration command twice, check schema drift, round-trip all Excel entries, and test competing writes.
+- **10 Chrome browser tests** against the production build cover the original UI, responsive layouts, imports, studying, independent progress/stars, undo, and offline reload.
+- **7 configured-auth browser tests** exercise the real Stack browser SDK with HTTP fixtures; run `pnpm test:e2e:cloud`. This command builds with dummy public test keys, runs its tests, and automatically restores a build using your original environment afterward.
+- `pnpm db:validate`, `pnpm typecheck`, `pnpm lint`, reproducible installation, and production builds all pass.
+- Live Stack email delivery, real project credentials, hosted Prisma Postgres connectivity, and actual device installation remain deployment checks. No hosting deployment was performed.

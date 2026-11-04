@@ -1,30 +1,40 @@
-import { createClient } from '@supabase/supabase-js';
+import { getStackServerApp } from '@/lib/stack-server';
+import { getDatabase } from '@/lib/database';
+import { loadLibrary, saveLibrary, SyncConflict } from '@/lib/library-store';
 import { NextRequest, NextResponse } from 'next/server';
 import { snapshotSchema } from '@/lib/cloud-schema';
 const MAX_BYTES = 8 * 1024 * 1024;
 const json = (value: unknown, status = 200) => NextResponse.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
-async function authenticate(request: NextRequest) {
+async function authenticate(request: NextRequest): Promise<{ error: NextResponse } | { user: { id: string } }> {
     const token = request.headers.get('authorization')?.match(/^Bearer (.+)$/)?.[1];
     if (!token)
         return { error: json({ error: 'Sign in to sync your cards.' }, 401) };
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (!url || !key)
-        return { error: json({ error: 'Cloud sync is not configured.' }, 503) };
-    const client = createClient(url, key, { global: { headers: { Authorization: `Bearer ${token}` } }, auth: { persistSession: false, autoRefreshToken: false } });
-    const { data: { user }, error } = await client.auth.getUser(token);
-    if (error || !user)
-        return { error: json({ error: 'Your session expired. Sign in again.' }, 401) };
-    return { client, user };
+    const app = getStackServerApp();
+    if (!app) return { error: json({ error: 'Cloud sync is not configured.' }, 503) };
+    try {
+        // Stack validates the request token with its server SDK. Never resolve a
+        // user by an untrusted userId, or use a decoded JWT without verification.
+        const user = await app.getUser({ tokenStore: request });
+        if (!user) return { error: json({ error: 'Your session expired. Sign in again.' }, 401) };
+        const expectedOwner = request.headers.get('x-mori-owner');
+        if (expectedOwner && expectedOwner !== user.id)
+            return { error: json({ error: 'Account changed. Sync was cancelled.' }, 409) };
+        if (!process.env.DATABASE_URL)
+            return { error: json({ error: 'Cloud database is not configured.' }, 503) };
+        return { user };
+    } catch {
+        return { error: json({ error: 'Could not verify your session. Please try again.' }, 503) };
+    }
 }
 export async function GET(request: NextRequest) {
     const auth = await authenticate(request);
-    if ('error' in auth)
-        return auth.error;
-    const { data, error } = await auth.client.from('user_state').select('state, updated_at, revision').eq('user_id', auth.user.id).maybeSingle();
-    if (error)
-        return json({ error: 'Could not load your cloud cards.' }, 500);
-    return json(data ? { state: data.state, updatedAt: data.updated_at, revision: data.revision } : { state: null, revision: null });
+    if ('error' in auth) return auth.error;
+    try {
+        const data = await loadLibrary(getDatabase(), auth.user.id);
+        return json(data || { state: null, revision: null });
+    } catch {
+        return json({ error: 'Could not load your cloud cards.' }, 503);
+    }
 }
 export async function POST(request: NextRequest) {
     const auth = await authenticate(request);
@@ -57,17 +67,20 @@ export async function POST(request: NextRequest) {
             offset += chunk.byteLength;
         }
         const body = JSON.parse(new TextDecoder().decode(bytes));
+        if (!body || typeof body !== 'object' || Array.isArray(body))
+            return json({ error: 'Invalid library data.' }, 400);
         const parsed = snapshotSchema.safeParse(body.state);
         if (!parsed.success)
             return json({ error: parsed.error.issues[0]?.message || 'Invalid library.' }, 400);
-        if (body.expectedRevision !== null && (!Number.isSafeInteger(body.expectedRevision) || body.expectedRevision < 1))
+        if (body.expectedRevision !== null && (!Number.isSafeInteger(body.expectedRevision) || body.expectedRevision < 1 || body.expectedRevision >= 2147483647))
             return json({ error: 'Invalid sync version.' }, 400);
-        const { data, error } = await auth.client.rpc('save_user_state', { new_state: parsed.data, expected_revision: body.expectedRevision ?? null });
-        if (error?.message.includes('sync_conflict'))
-            return json({ error: 'Your cloud library changed on another device. Reload cloud cards before syncing. Your local cards are preserved.' }, 409);
-        if (error)
-            return json({ error: 'Could not sync. Your cards remain saved on this device.' }, 500);
-        return json({ updatedAt: data.updated_at, revision: data.revision });
+        try {
+            const data = await saveLibrary(getDatabase(), auth.user.id, parsed.data, body.expectedRevision);
+            return json({ updatedAt: data.updatedAt, revision: data.revision });
+        } catch (error) {
+            if (error instanceof SyncConflict) return json({ error: error.message }, 409);
+            return json({ error: 'Could not sync. Your cards remain saved on this device.' }, 503);
+        }
     }
     catch {
         return json({ error: 'Invalid library data.' }, 400);
