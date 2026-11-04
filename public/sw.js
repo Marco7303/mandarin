@@ -1,4 +1,4 @@
-const CACHE = 'mori-shell-v7';
+const CACHE = 'mori-shell-v8';
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
@@ -6,7 +6,7 @@ self.addEventListener('install', event => {
     if (!response.ok) throw new Error('Shell unavailable');
     await cache.put('/', response.clone());
     const html = await response.text();
-    const assets = new Set(['/icon-192.png','/icon-512.png','/manifest.webmanifest']);
+    const assets = new Set(['/icon-192.png?v=mori-1','/icon-512.png?v=mori-1','/icon-maskable-512.png','/apple-touch-icon.png','/icon.svg?v=mori-1','/favicon.ico?v=mori-1','/manifest.webmanifest']);
     for (const match of html.matchAll(/(?:src|href)="([^" ]+)"/g)) {
       const url = new URL(match[1].replaceAll('&amp;','&'), self.location.origin);
       if (url.origin === self.location.origin && url.pathname.startsWith('/_next/static/')) assets.add(url.href);
