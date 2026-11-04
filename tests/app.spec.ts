@@ -8,6 +8,8 @@ test('create and edit vocabulary, aligned pronunciation, independent fronts and 
  await page.getByLabel('Name',{exact:true}).fill('Test folder');
  await page.getByRole('button',{name:'Create',exact:true}).click();
  await page.getByRole('button',{name:'Create a study set'}).click();
+ await expect(page.getByRole('dialog')).toContainText('saved only in this browser');
+ await page.getByRole('button',{name:'Continue in this browser',exact:true}).click();
  await page.getByLabel('Name',{exact:true}).fill('Test words');
  await page.getByLabel('Folder',{exact:true}).selectOption({label:'Test folder'});
  await page.getByRole('button',{name:'Create',exact:true}).click();
@@ -193,5 +195,24 @@ test('learned cards stay done; words and sets can be reset without losing stars'
  await page.getByRole('button',{name:'Reset progress',exact:true}).click();
  const state=await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state);
  expect(Object.keys(state.progress)).toHaveLength(0);expect(state.entries).toHaveLength(2);expect(Object.values(state.stars)).toContain(true);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+test('guest set creation explains browser storage and can be cancelled or continued locally', async ({page}) => {
+ await page.setViewportSize({width:390,height:844});await page.goto('/');
+ await expect(page.getByRole('region',{name:'Browser-only storage'})).toContainText('Clearing browser data will delete your sets and progress.');
+ await page.getByRole('button',{name:'Create a study set',exact:true}).click();
+ await expect(page.getByRole('dialog')).toContainText('saved only in this browser');
+ await expect(page.getByLabel('Name',{exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Close dialog'}).click();
+ expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state.sets.length)).toBe(1);
+ await page.getByRole('button',{name:'Sets',exact:true}).click();
+ await page.getByRole('button',{name:'Create set',exact:true}).click();
+ await page.getByRole('button',{name:'Continue in this browser',exact:true}).click();
+ await page.getByLabel('Name',{exact:true}).fill('Local set');
+ await page.getByRole('button',{name:'Create',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Local set.'})).toBeVisible();
+ await page.reload();
+ expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state.sets.some((s:{name:string})=>s.name==='Local set'))).toBe(true);
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });

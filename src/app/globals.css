@@ -2728,3 +2728,26 @@ select {
 .collection-toolbar .button.subtle {
   color:#657759;
 }
+
+.guest-notice {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  padding:14px 18px;
+  margin-bottom:24px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#f0f3eb;
+  font-size:13px;
+}
+.guest-notice p {
+  margin:4px 0 0;
+  font-size:12px;
+  line-height:1.5;
+}
+.guest-notice .button { flex-shrink:0; }
+.account-prompt-actions { display:grid; gap:10px; margin-bottom:8px; }
+@media(max-width:640px) {
+  .guest-notice { flex-direction:column; align-items:stretch; gap:12px; padding:14px; }
+}

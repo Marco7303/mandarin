@@ -54,7 +54,7 @@ async function installCloudFixture(page: Page) {
     return { libraries, unexpected, setFailWrites(value: boolean) { failWrites = value; }, setRestricted(value: boolean) { restricted = value; } };
 }
 async function openSignIn(page: Page) {
-    await page.getByRole('button', { name: 'Account' }).click();
+    await page.getByRole('button', { name: 'Account', exact: true }).click();
     await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
 }
 async function signIn(page: Page, email: string, password = 'password123') {
@@ -99,7 +99,7 @@ test('signup uses the existing form and seeds an active account from Excel', asy
     const fixture = await installCloudFixture(page); await page.goto('/'); await openSignIn(page);
     await page.getByLabel('Email', { exact: true }).fill('new@example.com');
     await page.getByLabel('Password', { exact: true }).fill('password123');
-    await page.getByRole('button', { name: 'Create account', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Create account', exact: true }).click();
     await expect.poll(() => fixture.libraries.get('new@example.com')?.revision).toBe(1);
     expect(fixture.unexpected).toEqual([]);
 });
@@ -122,10 +122,12 @@ test('pending reviews survive a database outage and retry without duplication', 
 
 test('email-restricted signup stays local until verification', async ({ page }) => {
     const fixture = await installCloudFixture(page); fixture.setRestricted(true);
-    await page.goto('/'); await openSignIn(page);
+    await page.goto('/');
+    await page.getByRole('button', {name:'Create a study set',exact:true}).click();
+    await page.getByRole('dialog').getByRole('button', {name:'Create account',exact:true}).click();
     await page.getByLabel('Email', { exact: true }).fill('verify@example.com');
     await page.getByLabel('Password', { exact: true }).fill('password123');
-    await page.getByRole('button', { name: 'Create account', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Create account', exact: true }).click();
     await expect(page.getByText('Check your email to confirm your account.', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Account', exact: true })).toContainText('Not signed in');
     expect(fixture.libraries.size).toBe(0);
@@ -180,4 +182,38 @@ test('legacy cloud progress becomes Learning and Learned, and reset syncs withou
     expect(fixture.libraries.get('a@example.com')!.state.entries).toHaveLength(2);
     expect(fixture.libraries.get('a@example.com')!.state.stars).toEqual({ [entries[0].id+':chinese']: true });
     expect(fixture.unexpected).toEqual([]);
+});
+
+test('guest account prompt resumes set creation after signup and saves the set online', async ({page}) => {
+ const fixture=await installCloudFixture(page);await page.goto('/');
+ await page.getByRole('button',{name:'Create a study set',exact:true}).click();
+ const dialog=page.getByRole('dialog');
+ await expect(dialog.getByRole('heading',{name:'Save sets to your account'})).toBeVisible();
+ await expect(dialog).toContainText('Clearing browser data will delete it.');
+ await dialog.getByRole('button',{name:'Create account',exact:true}).click();
+ await expect(dialog.getByRole('button',{name:'Create account',exact:true})).toHaveClass(/primary/);
+ await page.getByLabel('Email',{exact:true}).fill('new@example.com');
+ await page.getByLabel('Password',{exact:true}).fill('password123');
+ await dialog.getByRole('button',{name:'Create account',exact:true}).click();
+ await expect(dialog.getByRole('heading',{name:'Create a study set',exact:true})).toBeVisible();
+ await expect(page.getByRole('region',{name:'Browser-only storage'})).toHaveCount(0);
+ await page.getByLabel('Name',{exact:true}).fill('Account set');
+ await dialog.getByRole('button',{name:'Create',exact:true}).click();
+ await expect.poll(()=>(fixture.libraries.get('new@example.com')?.state.sets as {name:string}[]|undefined)?.some(s=>s.name==='Account set')).toBe(true);
+ await page.getByRole('button',{name:'Home',exact:false}).first().click();
+ await page.getByRole('button',{name:'Create a study set',exact:true}).click();
+ await expect(dialog.getByRole('heading',{name:'Create a study set',exact:true})).toBeVisible();
+ await expect(dialog.getByRole('button',{name:'Continue in this browser',exact:true})).toHaveCount(0);
+ expect(fixture.unexpected).toEqual([]);
+});
+
+test('cancelling the account prompt cancels pending set creation', async ({page}) => {
+ const fixture=await installCloudFixture(page);await page.goto('/');
+ await page.getByRole('button',{name:'Create a study set',exact:true}).click();
+ await page.getByRole('dialog').getByRole('button',{name:'Sign in',exact:true}).click();
+ await page.getByRole('button',{name:'Close dialog'}).click();
+ await signIn(page,'a@example.com');
+ await expect.poll(()=>fixture.libraries.get('a@example.com')?.revision).toBe(1);
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ await expect(page.getByRole('heading',{name:'Mandarin flashcards'})).toBeVisible();
 });
