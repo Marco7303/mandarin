@@ -35,7 +35,7 @@ test('create and edit vocabulary, aligned pronunciation, independent fronts and 
  await page.getByRole('button',{name:'English',exact:true}).click();
  await page.getByRole('button',{name:'Start studying'}).click();
  await page.getByRole('button',{name:'Star prompt',exact:true}).click();
- await page.keyboard.press('Space');
+ await page.getByRole('button',{name:'Reveal answer',exact:true}).click();
  await page.keyboard.press('ArrowRight');
  state=await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state);
  expect(state.progress[entry.id+':chinese'].reviewCount).toBe(1);
@@ -165,7 +165,7 @@ test('learned cards stay done; words and sets can be reset without losing stars'
  await expect(page.getByRole('button',{name:'Due',exact:true})).toHaveCount(0);
  await page.getByRole('button',{name:'Start studying'}).click();
  await page.getByRole('button',{name:'Star prompt',exact:true}).click();
- await page.keyboard.press('Space');await page.keyboard.press('ArrowRight');
+ await page.getByRole('button',{name:'Reveal answer',exact:true}).click();await page.keyboard.press('ArrowRight');
  await page.keyboard.press('Space');await page.keyboard.press('ArrowLeft');
  await expect(page.getByRole('heading',{name:'Session complete'})).toBeVisible();
  await page.getByRole('button',{name:'Done',exact:true}).click();
@@ -214,5 +214,33 @@ test('guest set creation explains browser storage and can be cancelled or contin
  await expect(page.getByRole('heading',{name:'Local set.'})).toBeVisible();
  await page.reload();
  expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state.sets.some((s:{name:string})=>s.name==='Local set'))).toBe(true);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
+test('cards toggle closed without saving an answer, and character pinyin stays separate', async ({page}) => {
+ await page.setViewportSize({width:390,height:844});await page.goto('/');
+ await page.getByRole('button',{name:'Study cards',exact:true}).click();
+ await page.getByRole('button',{name:'Start studying',exact:true}).click();
+ await page.getByRole('button',{name:'Reveal answer',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Hide answer',exact:true})).toHaveAttribute('aria-expanded','true');
+ await page.getByRole('button',{name:'Show pinyin by character',exact:true}).click();
+ await expect(page.locator('.character-alignment')).toBeVisible();
+ await page.getByRole('button',{name:'Hide answer',exact:true}).click();
+ await expect(page.locator('.card-answer')).toHaveCount(0);
+ await expect(page.locator('.character-alignment')).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Know',exact:true})).toBeDisabled();
+ await expect(page.getByRole('button',{name:'Still learning',exact:true})).toBeDisabled();
+ await expect(page.locator('.session-header')).toContainText('1 / 20');
+ expect(await page.evaluate(()=>Object.keys(JSON.parse(localStorage.getItem('mori-v2:guest')!).state.progress).length)).toBe(0);
+ // Native keyboard activation toggles the focused card exactly once.
+ await page.getByRole('button',{name:'Reveal answer',exact:true}).press('Space');
+ await expect(page.getByRole('button',{name:'Hide answer',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Show pinyin by character',exact:true})).toHaveAttribute('aria-expanded','false');
+ await page.getByRole('button',{name:'Hide answer',exact:true}).press('Space');
+ await expect(page.getByRole('button',{name:'Reveal answer',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Reveal answer',exact:true}).click();
+ await page.getByRole('button',{name:'Star prompt',exact:true}).press('Space');
+ await expect(page.getByRole('button',{name:'Unstar prompt',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Hide answer',exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
