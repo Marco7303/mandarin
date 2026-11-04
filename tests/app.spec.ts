@@ -3,11 +3,11 @@ import path from 'node:path';
 
 test('create and edit vocabulary, aligned pronunciation, independent fronts and stars',async({page})=>{
  await page.goto('/');
- await expect(page.getByRole('heading',{name:'A little Mandarin, every day.'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Mandarin flashcards'})).toBeVisible();
  await page.getByRole('button',{name:'Create folder',exact:true}).first().click();
  await page.getByLabel('Name',{exact:true}).fill('Test folder');
  await page.getByRole('button',{name:'Create',exact:true}).click();
- await page.getByRole('button',{name:'A new beginning Create a study set'}).click();
+ await page.getByRole('button',{name:'Create a study set'}).click();
  await page.getByLabel('Name',{exact:true}).fill('Test words');
  await page.getByLabel('Folder',{exact:true}).selectOption({label:'Test folder'});
  await page.getByRole('button',{name:'Create',exact:true}).click();
@@ -23,7 +23,7 @@ test('create and edit vocabulary, aligned pronunciation, independent fronts and 
  await page.keyboard.press('Space');
  await expect(page.getByText('xuéshēng',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Know',exact:true}).click();
- await expect(page.getByRole('heading',{name:'Look at you grow.'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Session complete'})).toBeVisible();
  let state=await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state);
  const entry=state.entries.find((e:{english:string;setId:string})=>e.english==='student'&&e.setId!== 'unit-1');
  expect(state.progress[entry.id+':chinese'].reviewCount).toBe(1);
@@ -70,10 +70,10 @@ test('CSV and supplied workbook import through preview',async({page})=>{
 
 for(const viewport of [{width:390,height:844},{width:768,height:1024},{width:1440,height:900}])test(`responsive home and study ${viewport.width}`,async({page})=>{
  await page.setViewportSize(viewport);await page.goto('/');
- await expect(page.getByRole('heading',{name:'A little Mandarin, every day.'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Mandarin flashcards'})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
  await page.screenshot({path:`test-results/home-${viewport.width}.png`,fullPage:true});
- await page.getByRole('button',{name:'Let’s study'}).click();
+ await page.getByRole('button',{name:'Study cards'}).click();
  await page.getByRole('button',{name:'Start studying'}).click();
  await page.getByRole('button',{name:'Reveal answer'}).click();
  await expect(page.getByRole('button',{name:'Know',exact:true})).toBeEnabled();
@@ -84,16 +84,16 @@ for(const viewport of [{width:390,height:844},{width:768,height:1024},{width:144
 
 test('local auth explanation, manifest and offline preservation',async({page,context})=>{
  await page.goto('/');
- await page.getByRole('button',{name:'Your quiet corner'}).click();
- await expect(page.getByRole('heading',{name:'You’re learning locally'})).toBeVisible();
- await page.getByRole('button',{name:'Keep learning'}).click();
+ await page.getByRole('button',{name:'Account'}).click();
+ await expect(page.getByRole('heading',{name:'Local storage'})).toBeVisible();
+ await page.getByRole('button',{name:'Close',exact:true}).click();
  const manifest=await (await page.request.get('/manifest.webmanifest')).json();expect(manifest.display).toBe('standalone');expect(manifest.icons.length).toBeGreaterThan(0);
  await page.evaluate(async()=>{await navigator.serviceWorker.ready});
- await page.getByRole('button',{name:'Let’s study'}).click();await page.getByRole('button',{name:'Start studying'}).click();
+ await page.getByRole('button',{name:'Study cards'}).click();await page.getByRole('button',{name:'Start studying'}).click();
  await context.setOffline(true);
  await page.keyboard.press('Space');await page.keyboard.press('ArrowRight');
  const progress=await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state.progress);expect(Object.keys(progress).length).toBe(1);
- await page.reload();await expect(page.getByRole('heading',{name:'A little Mandarin, every day.'})).toBeVisible();
+ await page.reload();await expect(page.getByRole('heading',{name:'Mandarin flashcards'})).toBeVisible();
  expect(await page.evaluate(()=>Object.keys(JSON.parse(localStorage.getItem('mori-v2:guest')!).state.progress).length)).toBe(1);
  await context.setOffline(false);
 });
@@ -125,7 +125,7 @@ test('preview corrections and vertical import preserve user-confirmed pronunciat
 });
 
 test('Still learning leaves a card in Learning without extending the session, and undo restores its previous state',async({page})=>{
- await page.goto('/');await page.getByRole('button',{name:'Let’s study'}).click();
+ await page.goto('/');await page.getByRole('button',{name:'Study cards'}).click();
  await page.getByRole('button',{name:'Start studying'}).click();await page.keyboard.press('Space');await page.keyboard.press('ArrowLeft');
  await expect(page.locator('.session-header')).toContainText('2 / 20');
  await page.getByRole('button',{name:'Undo last answer'}).click();
@@ -143,7 +143,7 @@ test('API refuses unauthenticated cloud access and validates dictionary input',a
 });
 
 test('mixed Learning cards choose an eligible front and keep its progress independent',async({page})=>{
- await page.goto('/');await page.getByRole('heading',{name:'A little Mandarin, every day.'}).waitFor();
+ await page.goto('/');await page.getByRole('heading',{name:'Mandarin flashcards'}).waitFor();
  await page.evaluate(()=>{const stored=JSON.parse(localStorage.getItem('mori-v2:guest')!);const state=stored.state;state.entries=state.entries.slice(0,1);const id=state.entries[0].id;const progress={reviewCount:1,correctCount:1,incorrectCount:0,consecutiveCorrect:1,stage:1,lastResult:'know',lastReviewed:'2026-11-03T12:00:00.000Z',nextReview:'2028-11-03T12:00:00.000Z'};state.progress={[id+':chinese']:progress,[id+':english']:progress};state.preferences={prompt:'mixed',filter:'New',order:'Original',amount:'All'};localStorage.setItem('mori-v2:guest',JSON.stringify(stored))});
  await page.reload();await page.getByRole('button',{name:'Study Unit 1',exact:true}).click();
  await page.getByRole('button',{name:'Start studying'}).click();
@@ -156,7 +156,7 @@ test('mixed Learning cards choose an eligible front and keep its progress indepe
 
 test('learned cards stay done; words and sets can be reset without losing stars', async ({page}) => {
  await page.setViewportSize({width:390,height:844});
- await page.goto('/');await page.getByRole('heading',{name:'A little Mandarin, every day.'}).waitFor();
+ await page.goto('/');await page.getByRole('heading',{name:'Mandarin flashcards'}).waitFor();
  await page.evaluate(()=>{const stored=JSON.parse(localStorage.getItem('mori-v2:guest')!);stored.state.entries=stored.state.entries.slice(0,2);stored.state.preferences={prompt:'chinese',filter:'Due',order:'Review order',amount:'All'};localStorage.setItem('mori-v2:guest',JSON.stringify(stored))});
  await page.reload();await page.getByRole('button',{name:'Study Unit 1',exact:true}).click();
  await expect(page.getByRole('button',{name:'Learning',exact:true})).toHaveClass(/selected/);
@@ -165,7 +165,7 @@ test('learned cards stay done; words and sets can be reset without losing stars'
  await page.getByRole('button',{name:'Star prompt',exact:true}).click();
  await page.keyboard.press('Space');await page.keyboard.press('ArrowRight');
  await page.keyboard.press('Space');await page.keyboard.press('ArrowLeft');
- await expect(page.getByRole('heading',{name:'Look at you grow.'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Session complete'})).toBeVisible();
  await page.getByRole('button',{name:'Done',exact:true}).click();
  await page.reload();await page.getByRole('button',{name:'Study Unit 1',exact:true}).click();
  await page.getByRole('button',{name:'Start studying'}).click();

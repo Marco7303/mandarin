@@ -54,7 +54,7 @@ async function installCloudFixture(page: Page) {
     return { libraries, unexpected, setFailWrites(value: boolean) { failWrites = value; }, setRestricted(value: boolean) { restricted = value; } };
 }
 async function openSignIn(page: Page) {
-    await page.getByRole('button', { name: 'Your quiet corner' }).click();
+    await page.getByRole('button', { name: 'Account' }).click();
     await expect(page.getByLabel('Email', { exact: true })).toBeVisible();
 }
 async function signIn(page: Page, email: string, password = 'password123') {
@@ -71,7 +71,7 @@ test('existing sign-in form, SDK cookies, account isolation, cloud review and si
     await signIn(page, 'a@example.com');
     await expect.poll(() => fixture.libraries.get('a@example.com')?.revision).toBe(1);
     expect((fixture.libraries.get('a@example.com')!.state.entries as unknown[]).length).toBe(55);
-    await page.getByRole('button', { name: 'Let’s study' }).click();
+    await page.getByRole('button', { name: 'Study cards' }).click();
     await page.getByRole('button', { name: 'Start studying' }).click();
     await page.keyboard.press('Space'); await page.keyboard.press('ArrowRight');
     await expect.poll(() => Object.keys(fixture.libraries.get('a@example.com')?.state.progress as object || {}).length).toBe(1);
@@ -79,7 +79,7 @@ test('existing sign-in form, SDK cookies, account isolation, cloud review and si
     await settings(page);
     await expect(page.getByText('a@example.com', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Your quiet corner' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Account', exact: true })).toContainText('Not signed in');
     expect(await page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('mori-v2:guest')!).state.progress).length)).toBe(0);
     await page.getByRole('button', { name: 'Home', exact: false }).first().click();
     await signIn(page, 'b@example.com');
@@ -108,7 +108,7 @@ test('pending reviews survive a database outage and retry without duplication', 
     const fixture = await installCloudFixture(page); await page.goto('/'); await signIn(page, 'a@example.com');
     await expect.poll(() => fixture.libraries.get('a@example.com')?.revision).toBe(1);
     fixture.setFailWrites(true);
-    await page.getByRole('button', { name: 'Let’s study' }).click(); await page.getByRole('button', { name: 'Start studying' }).click();
+    await page.getByRole('button', { name: 'Study cards' }).click(); await page.getByRole('button', { name: 'Start studying' }).click();
     await page.keyboard.press('Space'); await page.keyboard.press('ArrowRight');
     await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('mori-v2:a@example.com')!).pending)).toBe(true);
     await page.reload(); await settings(page);
@@ -127,7 +127,7 @@ test('email-restricted signup stays local until verification', async ({ page }) 
     await page.getByLabel('Password', { exact: true }).fill('password123');
     await page.getByRole('button', { name: 'Create account', exact: true }).click();
     await expect(page.getByText('Check your email to confirm your account.', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Your quiet corner' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Account', exact: true })).toContainText('Not signed in');
     expect(fixture.libraries.size).toBe(0);
     expect(fixture.unexpected).toEqual([]);
 });
@@ -138,7 +138,7 @@ for (const keepDevice of [true, false]) test(`cloud conflict can ${keepDevice ? 
     const cloud = fixture.libraries.get('a@example.com')!;
     cloud.revision = 2;
     cloud.state.stars = { 'unit-1-1:english': true };
-    await page.getByRole('button', { name: 'Let’s study' }).click(); await page.getByRole('button', { name: 'Start studying' }).click();
+    await page.getByRole('button', { name: 'Study cards' }).click(); await page.getByRole('button', { name: 'Start studying' }).click();
     await page.keyboard.press('Space'); await page.keyboard.press('ArrowRight');
     await settings(page);
     await expect(page.getByRole('button', { name: 'Keep this device', exact: true })).toBeVisible();
