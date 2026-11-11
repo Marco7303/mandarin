@@ -57,8 +57,15 @@ async function installCloudFixture(page: Page) {
         libraries.set(owner, saved);
         return route.fulfill({ json: { revision: saved.revision, updatedAt: saved.updatedAt } });
     });
-    await page.route('**/api/community/profile', route => route.fulfill({ json: { displayName: '' } }));
-    return { libraries, unexpected, setFailWrites(value: boolean) { failWrites = value; }, setRestricted(value: boolean) { restricted = value; } };
+    const publicNames = new Map<string, string>();
+    let failProfile = false;
+    await page.route('**/api/community/profile', route => {
+        const request = route.request(), owner = request.headers()['x-mori-owner']!;
+        if (failProfile) return route.fulfill({ status: 503, json: { error: 'Could not load your public name. Please try again.' } });
+        if (request.method() === 'POST') publicNames.set(owner, request.postDataJSON().displayName);
+        return route.fulfill({ json: { displayName: publicNames.get(owner) || '' } });
+    });
+    return { libraries, unexpected, publicNames, setFailProfile(value: boolean) { failProfile = value; }, setFailWrites(value: boolean) { failWrites = value; }, setRestricted(value: boolean) { restricted = value; } };
 }
 async function openSignIn(page: Page) {
     await page.getByRole('button', { name: 'Account', exact: true }).click();
@@ -131,7 +138,7 @@ test('public publishing lets an existing account choose a name, update visibilit
 test('signed-in learners can report public sets without adding them or exposing account details', async ({ page }) => {
     const fixture = await installCloudFixture(page);
     await page.goto('/', { waitUntil: 'domcontentloaded' }); await signIn(page, 'reporter@example.com');
-    await expect(page.getByRole('button', { name: 'Account', exact: true })).toContainText('reporter');
+    await expect(page.getByRole('button', { name: 'Account', exact: true })).toContainText('Your account');
     await expect.poll(() => fixture.libraries.get('reporter@example.com')?.revision).toBe(1);
     const before = JSON.stringify(fixture.libraries.get('reporter@example.com'));
     const id = 'a3278291-32e0-4dbb-bbcb-013968d04c98';
@@ -495,5 +502,76 @@ test('a signed-in recipient syncs a whole folder copy without changing their pre
  expect(saved.entries).toHaveLength(57);
  await page.reload();
  await expect(page.getByRole('navigation', { name: 'Library', exact: true }).getByRole('button', { name: 'Received course', exact: true })).toBeVisible();
+ expect(fixture.unexpected).toEqual([]);
+});
+
+
+test('an existing account edits its public name in Settings, reuses it when publishing, and opens an account panel instead of signing in', async ({ page }) => {
+ const fixture = await installCloudFixture(page);
+ await page.goto('/', { waitUntil: 'domcontentloaded' }); await signIn(page, 'existing-profile@example.com');
+ await expect.poll(() => fixture.libraries.get('existing-profile@example.com')?.revision).toBe(1);
+ const before = JSON.stringify(fixture.libraries.get('existing-profile@example.com'));
+ await page.getByRole('button', { name: 'Account', exact: true }).click();
+ const dialog = page.getByRole('dialog');
+ await expect(dialog.getByRole('heading', { name: 'Your account', exact: true })).toBeVisible();
+ await expect(dialog.getByText('existing-profile@example.com', { exact: true })).toBeVisible();
+ await expect(dialog.getByRole('textbox', { name: 'Email', exact: true })).toHaveCount(0);
+ await expect(dialog.getByRole('button', { name: 'Sign out', exact: true })).toBeVisible();
+ await dialog.getByRole('button', { name: 'Account settings', exact: true }).click();
+ await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
+ const name = page.getByRole('textbox', { name: 'Public name', exact: true });
+ await expect(name).toHaveValue('');
+ await name.fill('private@example.com'); await page.getByRole('button', { name: 'Save name', exact: true }).click();
+ await expect(page.locator('.public-profile [role=alert]')).toContainText('rather than an email');
+ await name.fill('Taiwan learner'); await page.getByRole('button', { name: 'Save name', exact: true }).click();
+ await expect(page.locator('.public-profile [role=status]')).toHaveText('Public name saved.');
+ await expect(page.getByRole('button', { name: 'Account', exact: true })).toContainText('Taiwan learner');
+ expect(fixture.publicNames.get('existing-profile@example.com')).toBe('Taiwan learner');
+ expect(JSON.stringify(fixture.libraries.get('existing-profile@example.com'))).toBe(before);
+ await page.setViewportSize({ width: 390, height: 844 });
+ await page.screenshot({ path: 'test-results/settings-public-name-mobile.png', fullPage: true });
+ expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+ await page.setViewportSize({ width: 1440, height: 1000 });
+ await page.screenshot({ path: 'test-results/settings-public-name-desktop.png', fullPage: true });
+ await page.reload();
+ await page.getByRole('button', { name: 'Account', exact: true }).click();
+ await expect(dialog).toContainText('Taiwan learner');
+ await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click();
+ await page.route('**/api/shares**', route => route.fulfill({ json: { share: null } }));
+ await page.locator('.set-open').first().click();
+ await page.getByRole('button', { name: 'Share', exact: true }).click();
+ await dialog.getByRole('radio', { name: /^Public/ }).check();
+ await expect(dialog.getByRole('textbox', { name: 'Public name', exact: true })).toHaveValue('Taiwan learner');
+ await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click();
+ await page.getByRole('button', { name: 'Account', exact: true }).click();
+ await dialog.getByRole('button', { name: 'Sign out', exact: true }).click();
+ await expect(dialog).toHaveCount(0);
+ await expect(page.getByRole('button', { name: 'Account', exact: true })).toContainText('Not signed in');
+ await signIn(page, 'different-profile@example.com');
+ await expect.poll(() => fixture.libraries.get('different-profile@example.com')?.revision).toBe(1);
+ await settings(page);
+ await expect(page.getByRole('textbox', { name: 'Public name', exact: true })).toHaveValue('');
+ await expect(page.getByRole('button', { name: 'Account', exact: true })).not.toContainText('Taiwan learner');
+ expect(fixture.unexpected).toEqual([]);
+});
+
+test('profile loading can fail, retry and recover without blocking study or losing the signed-in account', async ({ page, context }) => {
+ const fixture = await installCloudFixture(page); fixture.setFailProfile(true);
+ await page.goto('/', { waitUntil: 'domcontentloaded' }); await signIn(page, 'profile-retry@example.com');
+ await expect.poll(() => fixture.libraries.get('profile-retry@example.com')?.revision).toBe(1);
+ await settings(page);
+ await expect(page.locator('.public-profile [role=alert]')).toContainText('Could not load your public name');
+ await page.getByRole('button', { name: 'Account', exact: true }).click();
+ await expect(page.getByRole('dialog')).toContainText('profile-retry@example.com');
+ await expect(page.getByRole('dialog').getByRole('button', { name: 'Sign in', exact: true })).toHaveCount(0);
+ await page.getByRole('button', { name: 'Close dialog', exact: true }).click();
+ fixture.setFailProfile(false); fixture.publicNames.set('profile-retry@example.com', 'Recovered learner');
+ await page.locator('.public-profile').getByRole('button', { name: 'Try again', exact: true }).click();
+ await expect(page.getByRole('textbox', { name: 'Public name', exact: true })).toHaveValue('Recovered learner');
+ await context.setOffline(true);
+ await expect(page.getByText('Connect to the internet to edit your public name.', { exact: true })).toBeVisible();
+ await expect(page.getByRole('button', { name: 'Account', exact: true })).toContainText('Recovered learner');
+ await context.setOffline(false);
+ await expect(page.getByRole('textbox', { name: 'Public name', exact: true })).toHaveValue('Recovered learner');
  expect(fixture.unexpected).toEqual([]);
 });

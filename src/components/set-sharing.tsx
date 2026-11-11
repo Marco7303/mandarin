@@ -7,7 +7,8 @@ import { sharingRequest, communityRequest } from '@/lib/sharing-client';
 import { sharedDeckSchema, sharedDeckInputSchema, MAX_SHARE_BYTES, type SharedDeck } from '@/lib/sharing-schema';
 import { CharacterExplorer } from './character-explorer';
 
-export function ShareSet({ set, entries, owner, signedIn, onAuth, collectionSets }: {
+export function ShareSet({ set, entries, owner, signedIn, onAuth, collectionSets, onNameSaved }: {
+    onNameSaved?: (name: string) => void;
     collectionSets?: { id: string; name: string }[];
     set: { id: string; name: string }; entries: Entry[]; owner: string; signedIn: boolean; onAuth: (signup: boolean) => void;
 }) {
@@ -43,6 +44,7 @@ export function ShareSet({ set, entries, owner, signedIn, onAuth, collectionSets
             if (!input.success) throw new Error(input.error.issues[0]?.message || 'Check the sharing details.');
             if (new TextEncoder().encode(JSON.stringify(input.data)).length > MAX_SHARE_BYTES) throw new Error('This share exceeds 2 MB. Share smaller sets separately.');
             const saved = await sharingRequest('POST', owner, '', input.data);
+            if (saved?.creatorName) onNameSaved?.(saved.creatorName);
             setShare(saved); setFeedback(saved?.suppressed ? `Saved. This ${noun} remains unavailable to others.` : isPublic ? 'Published in Explore.' : share ? 'Shared version updated. Only people with the link can find it.' : 'Link created.');
         }
         catch (e) { setError(e instanceof Error ? e.message : 'Could not create the link.'); }

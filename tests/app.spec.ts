@@ -314,6 +314,7 @@ test('Explore searches and paginates public sets, previews character details and
 });
 
 test('Explore handles offline failure, retry and an empty community without changing the library',async({page,context})=>{
+ await context.setOffline(false);
  let fail=true,offline=false;
  await page.route('**/api/community?**',route=>offline?route.abort('internetdisconnected'):route.fulfill(fail?{status:503,json:{error:'Unavailable'}}:{json:{sets:[],nextCursor:null}}));
  await page.goto('/explore');

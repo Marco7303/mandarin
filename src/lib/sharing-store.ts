@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { PrismaClient, Prisma } from '@/generated/prisma/client';
 import type { SharedDeckInput } from './sharing-schema';
+import { writePublicName } from './profile-store';
 
 const publicFields = { id: true, name: true, entries: true, updatedAt: true, isPublic: true, description: true, creatorName: true, suppressed: true, kind: true, sets: true } as const;
 export function getSharedDeck(database: PrismaClient, id: string) {
@@ -19,8 +20,7 @@ export function publishSharedDeck(database: PrismaClient, ownerId: string, deck:
     };
     return database.$transaction(async tx => {
         if (deck.creatorName) {
-            await tx.creatorProfile.upsert({ where: { userId: ownerId }, create: { userId: ownerId, displayName: deck.creatorName }, update: { displayName: deck.creatorName } });
-            await tx.sharedDeck.updateMany({ where: { ownerId }, data: { creatorName: deck.creatorName } });
+            await writePublicName(tx, ownerId, deck.creatorName);
         }
         return tx.sharedDeck.upsert({
             where: { ownerId_setId_kind: { ownerId, setId: deck.setId, kind } },

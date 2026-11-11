@@ -10,6 +10,7 @@ import { PrismaClient } from '../generated/prisma/client';
 import { deleteSharedDeck, getOwnedShare, getSharedDeck, publishSharedDeck } from './sharing-store';
 import { sharedDeckInputSchema } from './sharing-schema';
 import seed from '../data/unit1.json';
+import { savePublicName } from './profile-store';
 import { findPublicSets, reportPublicSet } from './community-store';
 
 const deck = sharedDeckInputSchema.parse({ setId: 'unit-1', name: 'Unit 1', entries: seed });
@@ -193,5 +194,33 @@ describe('folder snapshots', () => {
         expect((await findPublicSets(prisma, { q: '', kind: 'folder' })).sets).toEqual([]);
         await deleteSharedDeck(prisma, 'owner', published.id);
         expect(await prisma.deckReport.count()).toBe(0);
+    });
+});
+
+
+describe('public profile settings', () => {
+    it('adds a name to an existing account and renames its published sets and folders without changing personal data or visibility', async () => {
+        await prisma.userState.create({ data: { userId: 'existing', state: { private: 'words and progress' }, revision: 19 } });
+        const before = await prisma.userState.findUnique({ where: { userId: 'existing' } });
+        expect(await savePublicName(prisma, 'existing', 'First name')).toEqual({ displayName: 'First name' });
+        const set = await publishSharedDeck(prisma, 'existing', { ...deck, creatorName: 'First name', isPublic: true });
+        const folder = await publishSharedDeck(prisma, 'existing', { ...deck, kind: 'folder', sets: [{ id: deck.setId, name: deck.name }], creatorName: 'First name', isPublic: false });
+        const other = await publishSharedDeck(prisma, 'other', { ...deck, creatorName: 'Other learner', isPublic: true });
+        await prisma.sharedDeck.update({ where: { id: folder.id }, data: { suppressed: true } });
+        await savePublicName(prisma, 'existing', 'Renamed learner');
+        expect(await prisma.creatorProfile.findUnique({ where: { userId: 'existing' } })).toEqual({ userId: 'existing', displayName: 'Renamed learner' });
+        expect(await getSharedDeck(prisma, set.id)).toMatchObject({ id: set.id, creatorName: 'Renamed learner', entries: set.entries, isPublic: true });
+        expect(await getOwnedShare(prisma, 'existing', deck.setId, 'folder')).toMatchObject({ id: folder.id, creatorName: 'Renamed learner', entries: folder.entries, isPublic: false, suppressed: true });
+        expect(await getSharedDeck(prisma, other.id)).toMatchObject({ creatorName: 'Other learner' });
+        expect(await prisma.userState.findUnique({ where: { userId: 'existing' } })).toEqual(before);
+    });
+    it('rolls back the name and all snapshots together if updating a shared snapshot fails', async () => {
+        await publishSharedDeck(prisma, 'owner', { ...deck, creatorName: 'Original name' });
+        await prisma.$executeRawUnsafe(`ALTER TABLE shared_deck ADD CONSTRAINT test_name CHECK (creator_name <> 'Rejected name')`);
+        try {
+            await expect(savePublicName(prisma, 'owner', 'Rejected name')).rejects.toThrow();
+            expect((await prisma.creatorProfile.findUnique({ where: { userId: 'owner' } }))?.displayName).toBe('Original name');
+            expect((await getOwnedShare(prisma, 'owner', deck.setId))?.creatorName).toBe('Original name');
+        } finally { await prisma.$executeRawUnsafe('ALTER TABLE shared_deck DROP CONSTRAINT test_name'); }
     });
 });

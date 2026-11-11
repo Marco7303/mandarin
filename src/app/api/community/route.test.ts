@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
-const mocks = vi.hoisted(() => ({ getUser: vi.fn(), getStackServerApp: vi.fn(), getDatabase: vi.fn(), findPublicSets: vi.fn(), reportPublicSet: vi.fn(), profile: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getUser: vi.fn(), getStackServerApp: vi.fn(), getDatabase: vi.fn(), findPublicSets: vi.fn(), reportPublicSet: vi.fn(), profile: vi.fn(), savePublicName: vi.fn() }));
 vi.mock('@/lib/stack-server', () => ({ getStackServerApp: mocks.getStackServerApp }));
+vi.mock('@/lib/profile-store', () => ({ savePublicName: mocks.savePublicName }));
 vi.mock('@/lib/database', () => ({ getDatabase: mocks.getDatabase }));
 vi.mock('@/lib/community-store', () => ({ findPublicSets: mocks.findPublicSets, reportPublicSet: mocks.reportPublicSet }));
 import { GET } from './route';
-import { GET as profileGET } from './profile/route';
+import { POST as profilePOST, GET as profileGET } from './profile/route';
 import { POST } from './[id]/report/route';
 const id = 'ed041eaf-0608-47d3-8998-70ac93739042';
 const context = { params: Promise.resolve({ id }) };
@@ -22,6 +23,7 @@ beforeEach(() => {
     mocks.getDatabase.mockReturnValue({ creatorProfile: { findUnique: mocks.profile } });
     mocks.findPublicSets.mockResolvedValue({ sets: [], nextCursor: null });
     mocks.profile.mockResolvedValue(null);
+    mocks.savePublicName.mockResolvedValue({ displayName: 'Learner' });
 });
 describe('community API', () => {
     it('allows anonymous bounded discovery, with no caching of revoked listings', async () => {
@@ -49,6 +51,9 @@ describe('community API', () => {
     it('requires authentication and current ownership for profile and report requests', async () => {
         const anonymous = new NextRequest('http://localhost/api/community');
         expect((await profileGET(anonymous)).status).toBe(401);
+        expect((await profilePOST(anonymous)).status).toBe(401);
+        expect((await profilePOST(request('/profile', { displayName: 'Learner' }, 'someone-else'))).status).toBe(409);
+        expect(mocks.savePublicName).not.toHaveBeenCalled();
         expect((await POST(anonymous, context)).status).toBe(401);
         expect((await profileGET(request('/profile', undefined, 'another-account'))).status).toBe(409);
         mocks.getUser.mockResolvedValue(null);
@@ -62,6 +67,17 @@ describe('community API', () => {
         for (const body of ['{', { reason: 'anything' }, { reason: 'Copyright or spam', details: 'x'.repeat(501) }])
             expect((await POST(request('', body), context)).status).toBe(400);
         expect((await POST(request('', ' '.repeat(4097)), context)).status).toBe(413);
+    });
+    it('edits only the verified account’s public name with bounded validated input', async () => {
+        const response = await profilePOST(request('/profile', { displayName: ' Learner ', userId: 'victim', email: 'private@example.com' }));
+        expect(response.status).toBe(200); expect(await response.json()).toEqual({ displayName: 'Learner' });
+        expect(mocks.savePublicName).toHaveBeenCalledWith(expect.anything(), 'owner', 'Learner');
+        for (const body of ['{', {}, { displayName: '' }, { displayName: 'x' }, { displayName: 'x'.repeat(51) }, { displayName: 'private@example.com' }])
+            expect((await profilePOST(request('/profile', body))).status).toBe(400);
+        expect((await profilePOST(request('/profile', ' '.repeat(4097)))).status).toBe(413);
+        mocks.savePublicName.mockRejectedValue(new Error('postgresql://secret'));
+        const failed = await profilePOST(request('/profile', { displayName: 'Learner' }));
+        expect(failed.status).toBe(503); expect(await failed.text()).not.toContain('secret');
     });
     it('does not expose database or session errors', async () => {
         mocks.findPublicSets.mockRejectedValue(new Error('postgresql://secret'));
