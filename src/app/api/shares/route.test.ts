@@ -52,6 +52,14 @@ describe('sharing API privacy and validation', () => {
         expect(mocks.getOwnedShare).toHaveBeenCalledWith({ test: 'database' }, 'verified-owner', 'unit-1');
         expect((await GET(request(undefined, {}, 'http://localhost/api/shares'))).status).toBe(400);
     });
+    it('supports a verified owner’s folder snapshot and keeps folder/set lookups separate', async () => {
+        const folder = { ...deck, kind: 'folder', sets: [{ id: 'unit-1', name: 'Unit 1', private: 'secret' }], ownerId: 'victim' };
+        expect((await POST(request(folder))).status).toBe(200);
+        expect(mocks.publishSharedDeck).toHaveBeenCalledWith(expect.anything(), 'verified-owner', { ...deck, kind: 'folder', sets: [{ id: 'unit-1', name: 'Unit 1' }] });
+        await GET(request(undefined, {}, 'http://localhost/api/shares?setId=unit-1&kind=folder'));
+        expect(mocks.getOwnedShare).toHaveBeenCalledWith(expect.anything(), 'verified-owner', 'unit-1', 'folder');
+        expect((await GET(request(undefined, {}, 'http://localhost/api/shares?setId=unit-1&kind=unknown'))).status).toBe(400);
+    });
     it('allows anonymous reads and marks them uncached and unindexed', async () => {
         const result = await publicGET(new NextRequest(`http://localhost/api/shares/${id}`), context);
         expect(result.status).toBe(200); expect(mocks.getUser).not.toHaveBeenCalled();

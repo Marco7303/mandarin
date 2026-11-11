@@ -3,9 +3,10 @@ import type { z } from 'zod';
 import type { reportSchema } from './community-schema';
 
 // Metadata only: never send vocabulary, account IDs, or private set IDs in search results.
-const summaryFields = { id: true, name: true, description: true, creatorName: true, wordCount: true, updatedAt: true } as const;
-export async function findPublicSets(database: PrismaClient, query: { q: string; cursor?: string }) {
+const summaryFields = { id: true, name: true, description: true, creatorName: true, wordCount: true, updatedAt: true, kind: true, setCount: true } as const;
+export async function findPublicSets(database: PrismaClient, query: { q: string; cursor?: string; kind?: 'set' | 'folder' }) {
     const where: Prisma.SharedDeckWhereInput = { isPublic: true, suppressed: false };
+    if (query.kind) where.kind = query.kind;
     if (query.q) {
         // Treat SQL LIKE wildcards as literal search text.
         const contains = query.q.replace(/[\\%_]/g, '\\$&');

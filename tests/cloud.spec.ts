@@ -385,3 +385,115 @@ test('a signed-in recipient saves a shared copy online and keeps it after revoca
  expect(Object.keys(fixture.libraries.get('recipient@example.com')!.state.progress as object)).toHaveLength(1);
  expect(fixture.unexpected).toEqual([]);
 });
+
+
+test('existing users publish and manage a whole folder while unrelated sets and progress remain private', async ({ page }) => {
+ const fixture = await installCloudFixture(page);
+ await page.goto('/', { waitUntil: 'domcontentloaded' });
+ const state = {
+  folders: [{ id: 'mandarin-class', name: 'Mandarin Class' }, { id: 'private-folder', name: 'Private folder' }],
+  sets: [{ id: 'unit-1', folderId: 'mandarin-class', name: 'Unit 1' }, { id: 'unit-2', folderId: 'mandarin-class', name: 'Unit 2' },
+   { id: 'empty', folderId: 'mandarin-class', name: 'Empty set' }, { id: 'archived', folderId: 'mandarin-class', name: 'Archived set', archived: true },
+   { id: 'private-set', folderId: 'private-folder', name: 'Secret title' }],
+  entries: [seed[0], { ...seed[1], setId: 'unit-2' }, { ...seed[2], setId: 'private-set' },
+   { ...seed[3], setId: 'archived' }, { ...seed[4], archived: true }],
+  stars: { [`${seed[0].id}:chinese`]: true },
+  progress: { [`${seed[0].id}:chinese`]: { reviewCount: 1, correctCount: 1, incorrectCount: 0, consecutiveCorrect: 1, stage: 1, lastResult: 'know', lastReviewed: '2026-11-10T12:00:00.000Z' } },
+  preferences: { prompt: 'chinese', filter: 'Learning', order: 'Original', amount: '20' },
+ };
+ fixture.libraries.set('folder-owner@example.com', { state, revision: 7, updatedAt: '2026-11-10T12:00:00.000Z' });
+ let share: SharedDeck | null = null;
+ const writes: Record<string, unknown>[] = [], lookups: string[] = [];
+ await page.route('**/api/community/profile', route => route.fulfill({ json: { displayName: 'Class teacher' } }));
+ await page.route('**/api/shares**', route => {
+  const request = route.request();
+  expect(request.headers()['x-mori-owner']).toBe('folder-owner@example.com');
+  if (request.method() === 'GET') { lookups.push(request.url()); return route.fulfill({ json: { share } }); }
+  if (request.method() === 'DELETE') { share = null; return route.fulfill({ json: { success: true } }); }
+  const body = request.postDataJSON(); writes.push(body);
+  share = { ...body, id: 'b3278291-32e0-4dbb-bbcb-013968d04c98', updatedAt: new Date().toISOString(), suppressed: false };
+  return route.fulfill({ json: share });
+ });
+ await signIn(page, 'folder-owner@example.com');
+ await expect(page.locator('.set-card')).toHaveCount(3);
+ const before = JSON.stringify(fixture.libraries.get('folder-owner@example.com'));
+ await page.getByRole('navigation', { name: 'Library', exact: true }).getByRole('button', { name: 'Mandarin Class', exact: true }).click();
+ await page.getByRole('button', { name: 'Share folder', exact: true }).click();
+ const dialog = page.getByRole('dialog');
+ await expect(dialog.getByRole('heading', { name: 'Share folder', exact: true })).toBeVisible();
+ await expect(dialog).toContainText('2 sets · 2 words');
+ await dialog.getByText('Included sets', { exact: true }).click();
+ await expect(dialog.locator('li')).toHaveCount(2);
+ await expect(dialog).not.toContainText('Secret title');
+ await dialog.getByRole('radio', { name: /^Public/ }).check();
+ await expect(dialog.getByRole('textbox', { name: 'Public name', exact: true })).toHaveValue('Class teacher');
+ await dialog.getByRole('textbox', { name: 'Folder description', exact: true }).fill('A course in two units');
+ await page.setViewportSize({ width: 390, height: 844 });
+ await page.screenshot({ path: 'test-results/publish-folder-mobile.png', fullPage: true });
+ expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+ await dialog.getByRole('button', { name: 'Publish folder', exact: true }).click();
+ await expect(dialog.getByRole('status')).toHaveText('Published in Explore.');
+ expect(lookups[0]).toContain('kind=folder');
+ expect(writes).toHaveLength(1);
+ expect(writes[0]).toMatchObject({ kind: 'folder', setId: 'mandarin-class', isPublic: true, sets: [{ id: 'unit-1', name: 'Unit 1' }, { id: 'unit-2', name: 'Unit 2' }] });
+ expect(writes[0].entries).toHaveLength(2);
+ expect(writes[0]).not.toHaveProperty('progress'); expect(writes[0]).not.toHaveProperty('stars');
+ expect(JSON.stringify(writes[0])).not.toContain('folder-owner@example.com');
+ expect(JSON.stringify(writes[0])).not.toContain('private-set');
+ expect(JSON.stringify(fixture.libraries.get('folder-owner@example.com'))).toBe(before);
+ await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click();
+ await page.getByRole('button', { name: 'Manage Mandarin Class', exact: true }).click();
+ await page.getByRole('button', { name: 'Rename', exact: true }).click();
+ await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('Renamed course');
+ await dialog.getByRole('button', { name: 'Save changes', exact: true }).click();
+ expect(writes).toHaveLength(1);
+ await page.getByRole('button', { name: 'Share folder', exact: true }).click();
+ await dialog.getByRole('button', { name: 'Update shared version', exact: true }).click();
+ await expect.poll(() => writes.length).toBe(2);
+ expect(writes[1].name).toBe('Renamed course');
+ await expect(dialog.getByLabel('Share link', { exact: true })).toHaveValue(/b3278291-32e0-4dbb-bbcb-013968d04c98$/);
+ await dialog.getByRole('radio', { name: /Anyone with the link/ }).check();
+ await dialog.getByRole('button', { name: 'Save as unlisted', exact: true }).click();
+ await expect(dialog.getByRole('status')).toContainText('Only people with the link');
+ expect(writes[2].isPublic).toBe(false);
+ page.once('dialog', confirmation => confirmation.accept());
+ await dialog.getByRole('button', { name: 'Stop sharing', exact: true }).click();
+ await expect(dialog.getByRole('status')).toHaveText('Sharing stopped.');
+ expect(share).toBeNull();
+ await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click();
+ await page.getByRole('button', { name: 'Create folder', exact: true }).first().click();
+ await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('Empty folder');
+ await dialog.getByRole('button', { name: 'Create', exact: true }).click();
+ await page.locator('.folder-tabs').getByRole('button', { name: 'Empty folder', exact: true }).click();
+ await page.getByRole('button', { name: 'Share folder', exact: true }).click();
+ await expect(dialog.getByRole('button', { name: 'Create link', exact: true })).toBeDisabled();
+ await expect(dialog).toContainText('Add words before sharing this folder.');
+ expect(writes).toHaveLength(3); expect(fixture.unexpected).toEqual([]);
+});
+
+test('a signed-in recipient syncs a whole folder copy without changing their previous words or progress', async ({ page }) => {
+ const fixture = await installCloudFixture(page);
+ const id = 'b3278291-32e0-4dbb-bbcb-013968d04c98';
+ await page.route(`**/api/shares/${id}`, route => route.fulfill({ json: {
+  id, kind: 'folder', name: 'Received course', sets: [{ id: 'foreign-set', name: 'First unit' }, { id: 'foreign-set-2', name: 'Second unit' }],
+  entries: [{ ...seed[0], id: 'foreign-one', setId: 'foreign-set' }, { ...seed[1], id: 'foreign-two', setId: 'foreign-set-2' }], updatedAt: new Date().toISOString(),
+ } }));
+ await page.goto('/', { waitUntil: 'domcontentloaded' }); await signIn(page, 'recipient@example.com');
+ await expect.poll(() => fixture.libraries.get('recipient@example.com')?.revision).toBe(1);
+ const before = structuredClone(fixture.libraries.get('recipient@example.com')!.state);
+ await page.goto(`/share/${id}`);
+ await page.getByRole('button', { name: 'Add folder to library', exact: true }).click();
+ await expect(page.getByRole('heading', { name: 'Received course', exact: true })).toBeVisible();
+ await expect.poll(() => fixture.libraries.get('recipient@example.com')?.revision).toBe(2);
+ const saved = fixture.libraries.get('recipient@example.com')!.state;
+ expect(saved.progress).toEqual(before.progress); expect(saved.stars).toEqual(before.stars);
+ expect((saved.entries as unknown[]).slice(0, 55)).toEqual(before.entries);
+ const folders = saved.folders as { id: string; sourceShareId?: string }[];
+ expect(folders.filter(f => f.sourceShareId === id)).toHaveLength(1);
+ const folder = folders.find(f => f.sourceShareId === id)!;
+ expect((saved.sets as { folderId: string }[]).filter(s => s.folderId === folder.id)).toHaveLength(2);
+ expect(saved.entries).toHaveLength(57);
+ await page.reload();
+ await expect(page.getByRole('navigation', { name: 'Library', exact: true }).getByRole('button', { name: 'Received course', exact: true })).toBeVisible();
+ expect(fixture.unexpected).toEqual([]);
+});

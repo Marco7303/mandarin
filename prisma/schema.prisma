@@ -20,6 +20,9 @@ model SharedDeck {
   id          String       @id
   ownerId     String       @map("owner_id")
   setId       String       @map("set_id")
+  kind        String       @default("set")
+  sets        Json         @default("[]") @db.JsonB
+  setCount    Int          @default(1) @map("set_count")
   name        String
   entries     Json         @db.JsonB
   isPublic    Boolean      @default(false) @map("is_public")
@@ -30,7 +33,7 @@ model SharedDeck {
   reports     DeckReport[]
   updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  @@unique([ownerId, setId])
+  @@unique([ownerId, setId, kind])
   @@index([isPublic, suppressed, updatedAt, id])
   @@map("shared_deck")
 }

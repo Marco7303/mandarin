@@ -30,7 +30,7 @@ describe('PostgreSQL shared snapshots', () => {
     it('round-trips vocabulary without exposing owner or source set fields', async () => {
         const published = await publishSharedDeck(prisma, 'owner-a', deck);
         expect(published.id).toMatch(/^[a-f0-9-]{36}$/);
-        expect(Object.keys(published).sort()).toEqual(['creatorName', 'description', 'entries', 'id', 'isPublic', 'name', 'suppressed', 'updatedAt']);
+        expect(Object.keys(published).sort()).toEqual(['creatorName', 'description', 'entries', 'id', 'isPublic', 'kind', 'name', 'sets', 'suppressed', 'updatedAt']);
         expect(published.isPublic).toBe(false);
         expect(published.entries).toEqual(seed);
         expect(await getSharedDeck(prisma, published.id)).toEqual(published);
@@ -76,6 +76,8 @@ describe('public library and existing accounts', () => {
             await old.query('INSERT INTO shared_deck (id, owner_id, set_id, name, entries) VALUES ($1, $2, $3, $4, $5)', ['old-link', 'already-signed-up', deck.setId, deck.name, JSON.stringify(deck.entries)]);
             const before = (await old.query('SELECT * FROM user_state')).rows;
             await old.exec(fs.readFileSync('prisma/migrations/20261111120000_public_library/migration.sql', 'utf8'));
+            await old.exec(fs.readFileSync('prisma/migrations/20261111150000_shared_folders/migration.sql', 'utf8'));
+            expect((await old.query('SELECT kind, sets, set_count FROM shared_deck')).rows).toEqual([{ kind: 'set', sets: [], set_count: 1 }]);
             expect((await old.query('SELECT * FROM user_state')).rows).toEqual(before);
             expect((await old.query('SELECT id, is_public, word_count FROM shared_deck')).rows).toEqual([{ id: 'old-link', is_public: false, word_count: 55 }]);
             expect((await old.query('SELECT * FROM creator_profile')).rows).toEqual([]);
@@ -90,7 +92,7 @@ describe('public library and existing accounts', () => {
         for (const q of ['UNIT', 'class', 'mandarin']) {
             const result = await findPublicSets(prisma, { q });
             expect(result.sets).toHaveLength(1);
-            expect(Object.keys(result.sets[0]).sort()).toEqual(['creatorName', 'description', 'id', 'name', 'updatedAt', 'wordCount']);
+            expect(Object.keys(result.sets[0]).sort()).toEqual(['creatorName', 'description', 'id', 'kind', 'name', 'setCount', 'updatedAt', 'wordCount']);
             expect(result.sets[0].wordCount).toBe(55);
         }
         expect((await findPublicSets(prisma, { q: 'secret' })).sets).toEqual([]);
@@ -138,6 +140,58 @@ describe('public library and existing accounts', () => {
         await publishSharedDeck(prisma, 'owner-a', publicDeck);
         expect(await getSharedDeck(prisma, published.id)).toBeNull();
         await deleteSharedDeck(prisma, 'owner-a', published.id);
+        expect(await prisma.deckReport.count()).toBe(0);
+    });
+});
+
+describe('folder snapshots', () => {
+    const folder = sharedDeckInputSchema.parse({
+        kind: 'folder', setId: 'unit-1', name: 'Entire class', isPublic: true, creatorName: 'Class teacher',
+        sets: [{ id: 'unit-1', name: 'Unit 1' }, { id: 'unit-2', name: 'Unit 2' }],
+        entries: [seed[0], { ...seed[1], setId: 'unit-2' }],
+    });
+    it('keeps a folder independent from a set with the same source ID, and never changes an existing library', async () => {
+        await prisma.userState.create({ data: { userId: 'existing', state: { folders: ['private'], progress: { learned: true } }, revision: 12 } });
+        const before = await prisma.userState.findUnique({ where: { userId: 'existing' } });
+        const set = await publishSharedDeck(prisma, 'existing', deck);
+        const first = await publishSharedDeck(prisma, 'existing', folder);
+        expect(first.id).not.toBe(set.id);
+        expect(first.kind).toBe('folder'); expect(first.sets).toEqual(folder.sets);
+        expect(first.entries).toHaveLength(2);
+        expect((await getOwnedShare(prisma, 'existing', 'unit-1'))?.id).toBe(set.id);
+        expect((await getOwnedShare(prisma, 'existing', 'unit-1', 'folder'))?.id).toBe(first.id);
+        expect(await getOwnedShare(prisma, 'other', 'unit-1', 'folder')).toBeNull();
+        const updated = await publishSharedDeck(prisma, 'existing', { ...folder, sets: folder.sets!.slice(0, 1), entries: [seed[0]] });
+        expect(updated.id).toBe(first.id); expect(updated.sets).toHaveLength(1);
+        expect((await getSharedDeck(prisma, set.id))?.entries).toHaveLength(55);
+        expect(await prisma.userState.findUnique({ where: { userId: 'existing' } })).toEqual(before);
+    });
+    it('discovers folder metadata only, filters by kind, unpublishes and revokes without affecting constituent sets', async () => {
+        const set = await publishSharedDeck(prisma, 'owner', { ...deck, isPublic: true, creatorName: 'Class teacher' });
+        const published = await publishSharedDeck(prisma, 'owner', folder);
+        const all = (await findPublicSets(prisma, { q: '' })).sets;
+        expect(all).toHaveLength(2);
+        expect(all.find(row => row.kind === 'folder')).toMatchObject({ id: published.id, setCount: 2, wordCount: 2 });
+        expect(all[0]).not.toHaveProperty('sets'); expect(all[0]).not.toHaveProperty('entries');
+        expect((await findPublicSets(prisma, { q: 'class', kind: 'folder' })).sets.map(row => row.id)).toEqual([published.id]);
+        expect((await findPublicSets(prisma, { q: '', kind: 'set' })).sets.map(row => row.id)).toEqual([set.id]);
+        await publishSharedDeck(prisma, 'owner', { ...folder, isPublic: false });
+        expect((await findPublicSets(prisma, { q: '', kind: 'folder' })).sets).toEqual([]);
+        expect(await getSharedDeck(prisma, published.id)).not.toBeNull();
+        expect(await deleteSharedDeck(prisma, 'other', published.id)).toBe(false);
+        expect(await deleteSharedDeck(prisma, 'owner', published.id)).toBe(true);
+        expect(await getSharedDeck(prisma, published.id)).toBeNull();
+        expect(await getSharedDeck(prisma, set.id)).not.toBeNull();
+    });
+    it('applies reporting and moderation to the entire folder snapshot, without allowing republishing to bypass it', async () => {
+        const published = await publishSharedDeck(prisma, 'owner', folder);
+        expect(await reportPublicSet(prisma, 'reporter', published.id, { reason: 'Inaccurate content', details: '' })).toBe(1);
+        await prisma.sharedDeck.update({ where: { id: published.id }, data: { suppressed: true } });
+        expect(await getSharedDeck(prisma, published.id)).toBeNull();
+        await publishSharedDeck(prisma, 'owner', folder);
+        expect((await getOwnedShare(prisma, 'owner', folder.setId, 'folder'))?.suppressed).toBe(true);
+        expect((await findPublicSets(prisma, { q: '', kind: 'folder' })).sets).toEqual([]);
+        await deleteSharedDeck(prisma, 'owner', published.id);
         expect(await prisma.deckReport.count()).toBe(0);
     });
 });

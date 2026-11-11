@@ -2,15 +2,17 @@ import { randomUUID } from 'node:crypto';
 import type { PrismaClient, Prisma } from '@/generated/prisma/client';
 import type { SharedDeckInput } from './sharing-schema';
 
-const publicFields = { id: true, name: true, entries: true, updatedAt: true, isPublic: true, description: true, creatorName: true, suppressed: true } as const;
+const publicFields = { id: true, name: true, entries: true, updatedAt: true, isPublic: true, description: true, creatorName: true, suppressed: true, kind: true, sets: true } as const;
 export function getSharedDeck(database: PrismaClient, id: string) {
     return database.sharedDeck.findFirst({ where: { id, suppressed: false }, select: publicFields });
 }
-export function getOwnedShare(database: PrismaClient, ownerId: string, setId: string) {
-    return database.sharedDeck.findUnique({ where: { ownerId_setId: { ownerId, setId } }, select: publicFields });
+export function getOwnedShare(database: PrismaClient, ownerId: string, setId: string, kind = 'set') {
+    return database.sharedDeck.findUnique({ where: { ownerId_setId_kind: { ownerId, setId, kind } }, select: publicFields });
 }
 export function publishSharedDeck(database: PrismaClient, ownerId: string, deck: SharedDeckInput) {
+    const kind = deck.kind || 'set';
     const snapshot = { name: deck.name, entries: deck.entries as Prisma.InputJsonValue, wordCount: deck.entries.length,
+        sets: (deck.sets || []) as Prisma.InputJsonValue, setCount: kind === 'folder' ? deck.sets!.length : 1,
         ...(deck.isPublic !== undefined ? { isPublic: deck.isPublic } : {}),
         ...(deck.description !== undefined ? { description: deck.description } : {}),
         ...(deck.creatorName ? { creatorName: deck.creatorName } : {}),
@@ -21,8 +23,8 @@ export function publishSharedDeck(database: PrismaClient, ownerId: string, deck:
             await tx.sharedDeck.updateMany({ where: { ownerId }, data: { creatorName: deck.creatorName } });
         }
         return tx.sharedDeck.upsert({
-            where: { ownerId_setId: { ownerId, setId: deck.setId } },
-            create: { id: randomUUID(), ownerId, setId: deck.setId, ...snapshot },
+            where: { ownerId_setId_kind: { ownerId, setId: deck.setId, kind } },
+            create: { id: randomUUID(), ownerId, setId: deck.setId, kind, ...snapshot },
             update: snapshot, select: publicFields,
         });
     });

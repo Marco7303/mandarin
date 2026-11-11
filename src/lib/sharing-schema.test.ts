@@ -25,3 +25,21 @@ describe('public vocabulary allowlist', () => {
             expect(sharedDeckInputSchema.safeParse({ ...deck, entries }).success).toBe(false);
     });
 });
+
+describe('folder vocabulary allowlist', () => {
+    const folder = { ...deck, kind: 'folder', sets: [{ id: 'unit-1', name: 'Unit 1' }] };
+    it('keeps only set titles, vocabulary and explicit sharing metadata', () => {
+        const result = sharedDeckInputSchema.parse({ ...folder, folders: [{ name: 'PRIVATE' }], progress: { secret: true }, sets: [{ ...folder.sets[0], progress: 'PRIVATE', folderId: 'PRIVATE' }] });
+        expect(result.kind).toBe('folder'); expect(result.sets).toEqual(folder.sets);
+        expect(JSON.stringify(result)).not.toContain('PRIVATE');
+    });
+    it('rejects missing, empty, duplicate, excessive and unrelated folder sets', () => {
+        for (const data of [
+            { sets: undefined }, { sets: [] }, { sets: [folder.sets[0], folder.sets[0]] },
+            { sets: [...folder.sets, { id: 'empty', name: 'Empty set' }] },
+            { entries: [{ ...seed[0], setId: 'outside-folder' }] },
+            { sets: Array.from({ length: 101 }, (_, i) => ({ id: String(i), name: 'Set' })) },
+        ]) expect(sharedDeckInputSchema.safeParse({ ...folder, ...data }).success).toBe(false);
+        expect(sharedDeckInputSchema.safeParse({ ...folder, kind: 'set' }).success).toBe(false);
+    });
+});

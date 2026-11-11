@@ -8,8 +8,10 @@ export async function GET(request: NextRequest) {
     const auth = await authenticateShare(request);
     if ('error' in auth) return auth.error;
     const setId = request.nextUrl.searchParams.get('setId');
+    const kind = request.nextUrl.searchParams.get('kind');
+    if (kind && kind !== 'set' && kind !== 'folder') return shareJSON({ error: 'Invalid sharing type.' }, 400);
     if (!setId || setId.length > 160) return shareJSON({ error: 'A valid set is required.' }, 400);
-    try { return shareJSON({ share: await getOwnedShare(getDatabase(), auth.user.id, setId) }); }
+    try { return shareJSON({ share: await getOwnedShare(getDatabase(), auth.user.id, setId, ...(kind ? [kind] : [])) }); }
     catch { return shareJSON({ error: 'Could not load sharing settings. Please try again.' }, 503); }
 }
 export async function POST(request: NextRequest) {
@@ -19,7 +21,7 @@ export async function POST(request: NextRequest) {
     try { body = await readShareBody(request); }
     catch (error) {
         return error instanceof ShareBodyTooLarge
-            ? shareJSON({ error: 'This set exceeds the 2 MB sharing limit.' }, 413)
+            ? shareJSON({ error: 'This share exceeds the 2 MB sharing limit.' }, 413)
             : shareJSON({ error: 'Invalid set data.' }, 400);
     }
     const parsed = sharedDeckInputSchema.safeParse(body);

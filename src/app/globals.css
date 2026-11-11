@@ -2877,3 +2877,24 @@ select {
   .explore-results > span { font-size: 12px; }
   .public-set-card { min-height: 200px; padding: 22px; }
 }
+
+.explore-filters { display:flex; gap:8px; margin:16px 0 22px; }
+.folder-share-summary { margin-bottom:20px; }
+.folder-share-summary summary { cursor:pointer; color:var(--green); font-size:14px; }
+.folder-share-summary ul { list-style:none; margin:12px 0; padding:0; }
+.folder-share-summary li { display:flex; justify-content:space-between; gap:16px; padding:8px 0; border-bottom:1px solid var(--line); overflow-wrap:anywhere; }
+.folder-share-summary li span { flex-shrink:0; color:var(--muted); font-size:13px; }
+.shared-folder-sets { display:grid; gap:12px; margin:24px 0; }
+.shared-folder-set { border:1px solid var(--line); border-radius:14px; background:var(--white); overflow:hidden; }
+.shared-folder-set > summary { padding:20px; cursor:pointer; display:flex; align-items:center; gap:14px; font-weight:500; }
+.shared-folder-set > summary::before { content:'›'; color:var(--green); transition:transform .15s; }
+.shared-folder-set[open] > summary::before { transform:rotate(90deg); }
+.shared-folder-set > summary span { flex:1; min-width:0; overflow-wrap:anywhere; }
+.shared-folder-set > summary small { flex-shrink:0; color:var(--muted); font-weight:400; }
+.shared-folder-set .shared-word-list { margin:0; }
+.shared-folder-set .shared-more { margin:16px; }
+@media (max-width:600px) {
+  .folder-tabs { flex-wrap:wrap; }
+  .folder-tab { max-width:100%; }
+  .folder-tab > button:first-child { min-width:0; white-space:normal; overflow-wrap:anywhere; }
+}

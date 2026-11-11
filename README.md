@@ -50,13 +50,13 @@ Regenerates `src/data/unit1.json` and `src/data/import-report.json` from the rea
 
 Full unchanged **EduKai 5.1**, supplied by the user, is served at `/fonts/edukai.ttf`. The embedded font metadata and official Taiwan Ministry of Education licence permit unchanged redistribution with attribution. Chinese content uses `lang="zh-Hant-TW"`; UI/Pinyin/English use Avenir Next with sans-serif fallbacks. Font size is approximately 15.8 MB because the licence prohibits modified derivatives; it is not subsetted. See [FONT-LICENSE.md](FONT-LICENSE.md). Attribution: **中華民國教育部**, CC BY-ND 3.0 TW. The original input file remains untouched.
 
-## Share study sets
+## Share study sets and folders
 
-Open a set and choose **Share** (or **Share link** in its menu). Signed-in users can create an unlisted link, copy it, explicitly update its shared version, or stop sharing. Words, notes, tags, examples, and pronunciation alignment are included; account details, folders, stars, and study progress are excluded. Anyone with the link can open it without an account. There is no public directory or search indexing.
+Open a set and choose **Share** (or **Share link** in its menu). Signed-in users can create an unlisted link, copy it, explicitly update its shared version, or stop sharing. Words, notes, tags, examples, and pronunciation alignment are included; account details, other folders, stars, and study progress are excluded. Anyone with the link can open it without an account. Public sets and folders also appear in Explore. Share pages are excluded from search indexing.
 
 Recipients preview the vocabulary and choose **Add to library** to save an independent copy in a folder. Each word gets a fresh ID and starts in Learning. Revisiting the same link offers **Open your copy**. Updates and revocation do not alter previously saved copies, which use the existing offline and account-sync behavior. Guests see the browser-storage notice and account signup action. A signed-in library must finish syncing before accepting a copy.
 
-Sharing adds one `shared_deck` table with one snapshot per owner/set, capped at 5,000 words and 2 MB per write. The existing Prisma Postgres and Hexclave configuration is sufficient; no additional service or environment variables are needed. Run `pnpm db:migrate` before using this feature or deploying the change. Public snapshots are fetched without caching; the service worker only caches the page shell, so revoked vocabulary is not available from an offline snapshot.
+Sharing uses `shared_deck` with one snapshot per owner, source ID and kind (set/folder), capped at 5,000 words and 2 MB per write. The existing Prisma Postgres and Hexclave configuration is sufficient; no additional service or environment variables are needed. Run `pnpm db:migrate` before using this feature or deploying the change. Public snapshots are fetched without caching; the service worker only caches the page shell, so revoked vocabulary is not available from an offline snapshot.
 
 ## Stack Auth, Prisma Postgres, and Vercel
 
@@ -105,9 +105,9 @@ Cloud setup needs your Stack Auth project and Prisma Postgres database. No autom
 
 ## Verification — 11 November 2026
 
-- **115 unit/integration tests** cover the original learning/import behavior, Stack Auth client adapter, account-scoped API access, invalid/oversized payloads, provider/database failures, and PostgreSQL persistence through the real Prisma client/pg adapter. Database tests run the actual migration command twice, check schema drift, round-trip all Excel entries, and test competing writes.
-- **21 Chrome browser tests** against the production build cover the original UI, responsive layouts, imports, studying, independent progress/stars, undo, and offline reload.
-- **14 configured-auth browser tests** exercise the real Stack browser SDK with HTTP fixtures; run `pnpm test:e2e:cloud`. This command builds with dummy public test keys, runs its tests, and automatically restores a build using your original environment afterward.
+- **121 unit/integration tests** cover the original learning/import behavior, Stack Auth client adapter, account-scoped API access, invalid/oversized payloads, provider/database failures, and PostgreSQL persistence through the real Prisma client/pg adapter. Database tests run the actual migration command twice, check schema drift, round-trip all Excel entries, and test competing writes.
+- **23 Chrome browser tests** against the production build cover the original UI, responsive layouts, imports, studying, independent progress/stars, undo, and offline reload.
+- **16 configured-auth browser tests** exercise the real Stack browser SDK with HTTP fixtures; run `pnpm test:e2e:cloud`. This command builds with dummy public test keys, runs its tests, and automatically restores a build using your original environment afterward.
 - `pnpm db:validate`, `pnpm typecheck`, `pnpm lint`, reproducible installation, and production builds all pass.
 - Live Stack email delivery, real project credentials, hosted Prisma Postgres connectivity, and actual device installation remain deployment checks. No hosting deployment was performed.
 
@@ -149,9 +149,9 @@ dictionary adaptations remain CC BY-SA 4.0; stroke graphics retain the Arphic Pu
 License. The script intentionally excludes unverified etymologies and third-party
 historical image binaries. Nothing is generated by AI.
 
-### Public sets / Explore
+### Public sets and folders / Explore
 
-Explore (`/explore`) lists explicitly published sets. Search matches title,
+Explore (`/explore`) lists explicitly published sets and folders. Search matches title,
 description and public creator name, case-insensitively. Results contain only
 metadata, in pages of 20 ordered by most recently updated. Keyset pagination
 does not depend on a previous result still existing. Discovery and shared-deck
@@ -167,15 +167,31 @@ new public name updates the creator's other shared snapshots. Publication is an
 explicit snapshot including words, notes and examples. Editing or archiving a
 personal set does not update/unpublish that snapshot. “Save as unlisted” removes
 it from Explore while keeping the link; “Stop sharing” revokes it. Existing
-recipients keep their copies. Folders remain private; public collections are a
-separate future feature.
+recipients keep their copies.
+
+Open a folder and choose **Share folder** (also in its three-dot menu). The same
+Public/Unlisted controls apply. Publishing includes all non-empty, non-archived
+sets and their active words, up to 100 sets / 5,000 words / 2 MB total. The dialog
+lists the included sets. No separate set links are created or changed; a folder
+snapshot is independent of any existing set shares. Moving, editing, archiving
+or adding sets in the private folder does not update the snapshot automatically.
+Recipients can expand each set to preview its words, then **Add folder to library**
+to create a new folder with fresh set/word IDs and separate progress. Reopening
+the same link offers the existing copy (restoring the folder if archived), with no
+silent merges or overwrites. Individually archived copied sets stay archived.
+Copies remain usable offline and after the owner unpublishes or revokes a link.
+Explore includes an All/Sets/Folders filter; reports/moderation also cover folders.
 
 Run `pnpm db:migrate` before deploying this version. Migration
 `20261111120000_public_library` only adds sharing metadata, `creator_profile`, and
 `deck_report`. It never rewrites `user_state`, account identities, progress, or
 existing link IDs. Existing shares default to **unlisted**, and existing accounts
 start without a public profile. Older clients can still update shared vocabulary
-without silently changing its visibility. No auth dashboard changes are needed.
+without silently changing its visibility. Migration `20261111150000_shared_folders`
+adds kind/grouping/count fields and scopes the unique snapshot key to its kind.
+Existing shares default to kind `set` and retain their IDs and visibility. No
+personal folders are republished or rewritten, and no re-registration or auth
+dashboard changes are needed. Apply both pending migrations before deployment.
 
 Signed-in users can report a public set, once per account per set. Reports are
 stored privately for manual review; they are not automatically judged or emailed.

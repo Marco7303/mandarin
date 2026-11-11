@@ -29,11 +29,13 @@ describe('community API', () => {
         expect(response.status).toBe(200);
         expect(mocks.getUser).not.toHaveBeenCalled();
         expect(mocks.findPublicSets).toHaveBeenCalledWith(expect.anything(), { q: '學' });
+        await GET(request('?kind=folder'));
+        expect(mocks.findPublicSets).toHaveBeenCalledWith(expect.anything(), { q: '', kind: 'folder' });
         expect(response.headers.get('cache-control')).toBe('no-store');
         expect(await response.json()).toEqual({ sets: [], nextCursor: null });
     });
     it('rejects oversized searches and malformed cursors before querying', async () => {
-        for (const path of [`?q=${'x'.repeat(101)}`, '?cursor=bad', '?cursor=2026-11-11T12:00:00Z%7Cbad'])
+        for (const path of [`?q=${'x'.repeat(101)}`, '?kind=invalid', '?cursor=bad', '?cursor=2026-11-11T12:00:00Z%7Cbad'])
             expect((await GET(request(path))).status).toBe(400);
         expect(mocks.findPublicSets).not.toHaveBeenCalled();
     });

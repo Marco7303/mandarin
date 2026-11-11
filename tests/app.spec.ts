@@ -478,3 +478,87 @@ test('word editor explores exact traditional characters, deduplicates them and h
  await page.getByRole('button',{name:'Close dialog'}).click();
  await expect(page.locator('.word-row')).toHaveCount(55);
 });
+
+
+test('public folders keep set structure, save once, preserve progress and work offline after copying', async ({ page, context }) => {
+ await page.setViewportSize({ width: 390, height: 844 });
+ const id = 'b3278291-32e0-4dbb-bbcb-013968d04c98';
+ const folder = { ...sharedSet, id, kind: 'folder', name: 'Mandarin course', isPublic: true, creatorName: 'Course teacher',
+  description: 'Two units for class', sets: [{ id: 'source-set', name: 'Unit A' }, { id: 'second-set', name: 'Unit B' }],
+  entries: [sharedWords[0], { ...sharedWords[1], setId: 'second-set' }] };
+ const searches: string[] = [];
+ await page.route('**/api/community?**', route => {
+  const url = new URL(route.request().url()); searches.push(url.search);
+  return route.fulfill({ json: { sets: url.searchParams.get('kind') === 'set' ? [] : [{ ...folder, entries: undefined, sets: undefined, setCount: 2, wordCount: 2 }], nextCursor: null } });
+ });
+ let revoked = false;
+ await page.route(`**/api/shares/${id}`, route => revoked ? route.fulfill({ status: 404, json: {} }) : route.fulfill({ json: folder }));
+ await page.goto('/');
+ await page.locator('.set-open').first().click();
+ await page.getByRole('button', { name: 'Study set', exact: true }).click();
+ await page.getByRole('button', { name: 'Start studying', exact: true }).click();
+ await page.getByRole('button', { name: 'Reveal answer', exact: true }).click();
+ await page.getByRole('button', { name: 'Know', exact: true }).click();
+ page.on('dialog', dialog => dialog.accept());
+ await page.getByRole('button', { name: 'End session', exact: true }).click();
+ const before = await page.evaluate(() => JSON.parse(localStorage.getItem('mori-v2:guest')!).state);
+ await page.getByRole('button', { name: 'Explore', exact: true }).first().click();
+ await page.getByRole('group', { name: 'Content type' }).getByRole('button', { name: 'Folders', exact: true }).click();
+ await expect(page.getByRole('link', { name: /Mandarin course/ })).toContainText('Folder · 2 sets · 2 words');
+ expect(searches.at(-1)).toContain('kind=folder');
+ await page.getByRole('link', { name: /Mandarin course/ }).click();
+ await expect(page.getByText('PUBLIC FOLDER', { exact: true })).toBeVisible();
+ await expect(page.getByRole('combobox', { name: 'Save to folder' })).toHaveCount(0);
+ await expect(page.locator('.shared-word')).toHaveCount(0);
+ await page.locator('.shared-folder-set > summary').filter({ hasText: 'Unit A' }).click();
+ await expect(page.locator('.shared-word')).toHaveCount(1);
+ await expect(page.getByText('學生', { exact: true })).toBeVisible();
+ await page.screenshot({ path: 'test-results/folder-preview-mobile.png', fullPage: true });
+ expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+ await page.setViewportSize({ width: 1440, height: 1000 });
+ await page.screenshot({ path: 'test-results/folder-preview-desktop.png', fullPage: true });
+ await page.getByRole('button', { name: 'Add folder to library', exact: true }).click();
+ await expect(page.getByRole('heading', { name: 'Mandarin course', exact: true })).toBeVisible();
+ await expect(page.locator('.set-card')).toHaveCount(2);
+ const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('mori-v2:guest')!).state);
+ const copy = saved.folders.find((f: { sourceShareId?: string }) => f.sourceShareId === id);
+ const sets = saved.sets.filter((s: { folderId: string }) => s.folderId === copy.id);
+ expect(sets.map((s: { name: string }) => s.name)).toEqual(['Unit A', 'Unit B']);
+ expect(sets.every((s: { id: string }) => !['source-set', 'second-set'].includes(s.id))).toBe(true);
+ expect(saved.entries.filter((e: { setId: string }) => sets.some((s: { id: string }) => s.id === e.setId))).toHaveLength(2);
+ expect(saved.progress).toEqual(before.progress); expect(saved.stars).toEqual(before.stars);
+ expect(saved.entries.slice(0, before.entries.length)).toEqual(before.entries);
+ await page.goto(`/share/${id}`);
+ await expect(page.getByRole('button', { name: 'Open your copy', exact: true })).toBeVisible();
+ await page.getByRole('button', { name: 'Open your copy', exact: true }).click();
+ const again = await page.evaluate(() => JSON.parse(localStorage.getItem('mori-v2:guest')!).state);
+ expect(again.folders.filter((f: { sourceShareId?: string }) => f.sourceShareId === id)).toHaveLength(1);
+ await page.getByRole('button', { name: 'Manage Mandarin course', exact: true }).click();
+ await page.getByRole('button', { name: 'Archive', exact: true }).click();
+ await page.goto(`/share/${id}`);
+ await page.getByRole('button', { name: 'Open your copy', exact: true }).click();
+ await expect(page.locator('.set-card')).toHaveCount(2);
+ revoked = true;
+ await page.goto(`/share/${id}`);
+ await expect(page.getByRole('heading', { name: 'Set unavailable', exact: true })).toBeVisible();
+ await page.getByRole('button', { name: 'Open your copy', exact: true }).click();
+ await page.evaluate(async () => { await navigator.serviceWorker.ready; if (!navigator.serviceWorker.controller) await new Promise<void>(resolve => navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true })); });
+ await context.setOffline(true); await page.reload();
+ await page.getByRole('navigation', { name: 'Library', exact: true }).getByRole('button', { name: 'Mandarin course', exact: true }).click();
+ await page.locator('.set-open').filter({ hasText: 'Unit A' }).click();
+ await page.getByRole('button', { name: 'Study set', exact: true }).click();
+ await page.getByRole('button', { name: 'Start studying', exact: true }).click();
+ await page.getByRole('button', { name: 'Reveal answer', exact: true }).click();
+ await expect(page.getByText('student', { exact: true })).toBeVisible();
+ await context.setOffline(false);
+});
+
+test('guests are prompted to sign in before publishing a folder', async ({ page }) => {
+ let published = 0;
+ await page.route('**/api/shares**', route => { published++; return route.fulfill({ status: 401, json: {} }); });
+ await page.goto('/');
+ await page.getByRole('navigation', { name: 'Library', exact: true }).getByRole('button', { name: 'Mandarin Class', exact: true }).click();
+ await page.getByRole('button', { name: 'Share folder', exact: true }).click();
+ await expect(page.getByRole('dialog')).toContainText('Create an account or sign in to share this folder.');
+ expect(published).toBe(0);
+});

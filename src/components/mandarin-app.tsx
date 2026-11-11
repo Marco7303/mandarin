@@ -10,6 +10,7 @@ import { buildQueue, isLearned, makeEntry, normalizeStudyPreferences, recordAnsw
 import { parseFile, parseText, exportCSV, validateEntries, type ImportResult } from '@/lib/importer';
 import { getClient, getSession, onAuthStateChange, getCloudRevision, loadCloud, saveCloud, signIn, signUp, signOut } from '@/lib/cloud';
 type Folder = {
+    sourceShareId?: string;
     id: string;
     name: string;
     archived?: boolean;
@@ -52,6 +53,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 export default function MandarinApp({ shareId }: { shareId?: string }) {
     const [incomingShareId, setIncomingShareId] = useState(shareId || '');
     const [sharingSetId, setSharingSetId] = useState('');
+    const [sharingFolderId, setSharingFolderId] = useState('');
     const [sharedFromExplore, setSharedFromExplore] = useState(false);
     const [data, setData] = useState<State>(initialState);
     const [ready, setReady] = useState(false);
@@ -416,10 +418,31 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
     function toggleStar(id: string, d: Direction) { update(s => ({ ...s, stars: { ...s.stars, [key(id, d)]: !s.stars[key(id, d)] } })); }
     function exportEntries(list: Entry[], name: string) { const blob = new Blob([exportCSV(list)], { type: 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${name}.csv`; a.click(); URL.revokeObjectURL(url); setMenu(null); }
     function duplicateSet(s: Set) { const id = uid(); update(d => ({ ...d, sets: [...d.sets, { ...s, sourceShareId: undefined, id, name: `${s.name} copy` }], entries: [...d.entries, ...entries.filter(e => e.setId === s.id).map(e => ({ ...e, id: uid(), setId: id }))] })); setMenu(null); notify('Set duplicated'); }
-    function openShare(setId: string) { setSharingSetId(setId); setMenu(null); setModal('share'); }
+    function openShare(setId: string) { setSharingFolderId(''); setSharingSetId(setId); setMenu(null); setModal('share'); }
+    function openFolderShare(folderId: string) { setSharingSetId(''); setSharingFolderId(folderId); setMenu(null); setModal('share'); }
+    function openSharedFolder(id: string) {
+        update(d => ({ ...d, folders: d.folders.map(f => f.id === id ? { ...f, archived: false } : f) }));
+        setActiveFolder(id); setShowArchived(false); navigate('sets');
+    }
     function saveSharedSet(deck: SharedDeck, folderId: string) {
         const current = dataRef.current;
         if (email && (!syncReady.current || syncConflict)) { notify('Sync your library before adding this set.'); return; }
+        if (deck.kind === 'folder') {
+            const existing = current.folders.find(f => f.sourceShareId === deck.id);
+            if (existing) { openSharedFolder(existing.id); return; }
+            if (current.folders.length >= 500 || current.sets.length + deck.sets.length > 2000 || current.entries.length + deck.entries.length > 20000) {
+                notify('Your library is full. Remove unused folders or sets before adding this one.'); return;
+            }
+            const folderId = uid();
+            const setIds = new Map(deck.sets.map(set => [set.id, uid()]));
+            const copied = deck.entries.map(entry => ({ ...entry, id: uid(), setId: setIds.get(entry.setId)! }));
+            update(d => ({ ...d,
+                folders: [...d.folders, { id: folderId, name: deck.name, sourceShareId: deck.id }],
+                sets: [...d.sets, ...deck.sets.map(set => ({ id: setIds.get(set.id)!, name: set.name, folderId }))],
+                entries: [...d.entries, ...copied],
+            }));
+            setActiveFolder(folderId); setShowArchived(false); navigate('sets'); notify('Folder added to your library'); return;
+        }
         const existing = current.sets.find(s => s.sourceShareId === deck.id);
         if (existing) { openSet(existing.id); return; }
         if (current.entries.length + deck.entries.length > 20000 || current.sets.length >= 2000) {
@@ -454,6 +477,9 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
         setPreferSignUp(signup); setAuthError(''); setModal('auth');
     }
     const sharingSet = data.sets.find(s => s.id === sharingSetId);
+    const sharingFolder = folders.find(f => f.id === sharingFolderId);
+    const folderSharingSets = activeSets.filter(s => s.folderId === sharingFolderId && entries.some(e => e.setId === s.id));
+    const sharedFolderCopy = data.folders.find(f => f.sourceShareId === incomingShareId);
     const sharedCopy = data.sets.find(s => s.sourceShareId === incomingShareId);
     const visibleSets = sets.filter(s => (activeFolder === 'all' || s.folderId === activeFolder) && (!query || s.name.toLowerCase().includes(query.toLowerCase()) || entries.some(e => e.setId === s.id && searchEntry(e, query))));
     const isStudy = screen === 'session' || screen === 'result';
@@ -473,8 +499,8 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
       <main id="main-content" className={cn('main', isStudy && 'session-main')}>
       {ready && !email && !isStudy && <section className="guest-notice" aria-label="Browser-only storage"><div><strong>Saved only in this browser</strong><p>Clearing browser data will delete your sets and progress.</p></div>{getClient() && <button className="button primary small" onClick={() => openAuth(true)}>Create account</button>}</section>}
       {!ready ? <div className="loading"><Leaf className="loading-leaf"/>Loading…</div> : <>
-      {(screen === 'explore' || (screen === 'shared' && sharedFromExplore)) && <div hidden={screen !== 'explore'}><Explore savedIds={data.sets.filter(s => !s.archived && !data.folders.find(f => f.id === s.folderId)?.archived).flatMap(s => s.sourceShareId ? [s.sourceShareId] : [])} onOpen={id => { setIncomingShareId(id); setSharedFromExplore(true); window.history.replaceState(null, '', `/share/${id}`); navigate('shared'); }} onLibrary={() => { setActiveFolder('all'); navigate('sets'); }}/></div>}
-      {screen === 'shared' && incomingShareId && <SharedSetPreview key={`${incomingShareId}:${libraryMeta.current.owner}`} id={incomingShareId} folders={folders} existing={sharedCopy} signedIn={!!email} canSave={!email || (syncReady.current && !syncConflict)} onSave={saveSharedSet} onOpen={id => { if (sharedCopy?.archived || data.folders.find(f => f.id === sharedCopy?.folderId)?.archived) { update(d => ({ ...d, sets: d.sets.map(s => s.id === id ? { ...s, archived: false } : s), folders: d.folders.map(f => f.id === sharedCopy?.folderId ? { ...f, archived: false } : f) })); } openSet(id); }} owner={libraryMeta.current.owner} onAuth={() => openAuth(false)} backToExplore={sharedFromExplore} onHome={() => navigate(sharedFromExplore ? 'explore' : 'home')}/>}
+      {(screen === 'explore' || (screen === 'shared' && sharedFromExplore)) && <div hidden={screen !== 'explore'}><Explore savedIds={[...data.folders.filter(f => !f.archived).flatMap(f => f.sourceShareId ? [f.sourceShareId] : []), ...data.sets.filter(s => !s.archived && !data.folders.find(f => f.id === s.folderId)?.archived).flatMap(s => s.sourceShareId ? [s.sourceShareId] : [])]} onOpen={id => { setIncomingShareId(id); setSharedFromExplore(true); window.history.replaceState(null, '', `/share/${id}`); navigate('shared'); }} onLibrary={() => { setActiveFolder('all'); navigate('sets'); }}/></div>}
+      {screen === 'shared' && incomingShareId && <SharedSetPreview key={`${incomingShareId}:${libraryMeta.current.owner}`} id={incomingShareId} folders={folders} existing={sharedFolderCopy || sharedCopy} signedIn={!!email} canSave={!email || (syncReady.current && !syncConflict)} onSave={saveSharedSet} onOpen={id => { if (sharedFolderCopy) { openSharedFolder(id); return; } if (sharedCopy?.archived || data.folders.find(f => f.id === sharedCopy?.folderId)?.archived) { update(d => ({ ...d, sets: d.sets.map(s => s.id === id ? { ...s, archived: false } : s), folders: d.folders.map(f => f.id === sharedCopy?.folderId ? { ...f, archived: false } : f) })); } openSet(id); }} owner={libraryMeta.current.owner} onAuth={() => openAuth(false)} backToExplore={sharedFromExplore} onHome={() => navigate(sharedFromExplore ? 'explore' : 'home')}/>}
       {screen === 'home' && <>
         <div className="page-heading"><div><h1>Your study space</h1></div><span className="date-label">{new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', weekday: 'short' })}</span></div>
         <section className="daily-card"><div className="daily-copy"><h2>Study cards</h2><p>{learning > 0 ? `${learning} words in Learning · ${labels[data.preferences.prompt]}` : 'All cards learned for the selected front.'}</p><button className="button primary" onClick={() => setup(activeSets.map(s => s.id), 'Learning')}>Study cards <ArrowRight size={18}/></button></div><div className="daily-character" aria-hidden="true"><span lang="zh-Hant-TW">學</span><div><i />xué <i /></div><small>to learn</small></div></section>
@@ -483,9 +509,9 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
         <button className="starred-banner" onClick={() => setup(activeSets.map(s => s.id), 'Starred')}><span className="starred-icon"><Star size={20}/></span><span><strong>Study starred cards</strong></span><span className="star-count">{starred} starred</span><ArrowRight size={19}/></button>
       </>}
       {screen === 'sets' && <>
-        <div className="page-heading"><div><h1>{activeFolder === 'all' ? 'All sets' : data.folders.find(f => f.id === activeFolder)?.name || 'All sets'}</h1></div><div className="heading-actions"><button className="button secondary" onClick={() => { setModal('import'); setImportResult(null); }}><Upload size={17}/>Import</button><button className="button primary" onClick={createSet}><Plus size={17}/>Create set</button></div></div>
+        <div className="page-heading"><div><h1>{activeFolder === 'all' ? 'All sets' : data.folders.find(f => f.id === activeFolder)?.name || 'All sets'}</h1></div><div className="heading-actions">{activeFolder !== 'all' && folders.some(f => f.id === activeFolder) && <button className="button secondary" onClick={() => openFolderShare(activeFolder)}><Share2 size={17}/>Share folder</button>}<button className="button secondary" onClick={() => { setModal('import'); setImportResult(null); }}><Upload size={17}/>Import</button><button className="button primary" onClick={createSet}><Plus size={17}/>Create set</button></div></div>
         <div className="collection-toolbar"><div className="search"><Search size={18}/><input aria-label="Search sets and words" placeholder="Find a set or a word…" value={query} onChange={e => setQuery(e.target.value)}/></div><button className="button subtle" onClick={() => setShowArchived(v => !v)}><Archive size={17}/>{showArchived ? 'Active sets' : 'Archived'}</button></div>
-        <div className="folder-tabs"><button className={cn(activeFolder === 'all' && 'selected')} onClick={() => setActiveFolder('all')}>All sets</button>{folders.map(f => <div key={f.id} className="folder-tab"><button className={cn(activeFolder === f.id && 'selected')} onClick={() => setActiveFolder(f.id)}><FolderIcon size={15}/>{f.name}</button><button className="folder-more" aria-label={`Manage ${f.name}`} onClick={() => setMenu(menu === f.id ? null : f.id)}><MoreHorizontal size={16}/></button>{menu === f.id && <div className="dropdown"><button onClick={() => { setEditing(f.id); setModal('folder'); setMenu(null); }}><Pencil size={16}/>Rename</button><button onClick={() => setup(data.sets.filter(s => s.folderId === f.id && !s.archived).map(s => s.id))}><Sparkles size={16}/>Study folder</button><button onClick={() => exportEntries(entries.filter(e => data.sets.find(s => s.id === e.setId)?.folderId === f.id), f.name)}><ArrowDownToLine size={16}/>Export</button><button onClick={() => { update(d => ({ ...d, folders: d.folders.map(x => x.id === f.id ? { ...x, archived: true } : x) })); setMenu(null); setActiveFolder('all'); }}><Archive size={16}/>Archive</button></div>}</div>)}<button aria-label="Create folder" onClick={() => { setEditing(null); setModal('folder'); }}><Plus size={18}/></button></div>
+        <div className="folder-tabs"><button className={cn(activeFolder === 'all' && 'selected')} onClick={() => setActiveFolder('all')}>All sets</button>{folders.map(f => <div key={f.id} className="folder-tab"><button className={cn(activeFolder === f.id && 'selected')} onClick={() => setActiveFolder(f.id)}><FolderIcon size={15}/>{f.name}</button><button className="folder-more" aria-label={`Manage ${f.name}`} onClick={() => setMenu(menu === f.id ? null : f.id)}><MoreHorizontal size={16}/></button>{menu === f.id && <div className="dropdown"><button onClick={() => openFolderShare(f.id)}><Share2 size={16}/>Share folder</button><button onClick={() => { setEditing(f.id); setModal('folder'); setMenu(null); }}><Pencil size={16}/>Rename</button><button onClick={() => setup(data.sets.filter(s => s.folderId === f.id && !s.archived).map(s => s.id))}><Sparkles size={16}/>Study folder</button><button onClick={() => exportEntries(entries.filter(e => data.sets.find(s => s.id === e.setId)?.folderId === f.id), f.name)}><ArrowDownToLine size={16}/>Export</button><button onClick={() => { update(d => ({ ...d, folders: d.folders.map(x => x.id === f.id ? { ...x, archived: true } : x) })); setMenu(null); setActiveFolder('all'); }}><Archive size={16}/>Archive</button></div>}</div>)}<button aria-label="Create folder" onClick={() => { setEditing(null); setModal('folder'); }}><Plus size={18}/></button></div>
         {selectedSets.length > 1 && <div className="selection-bar"><span>{selectedSets.length} sets selected</span><button className="button primary small" onClick={() => setup()}>Study selected <ArrowRight size={16}/></button><button className="text-button" onClick={() => setSelectedSets([])}>Clear</button></div>}
         {showArchived && data.folders.filter(f => f.archived).map(f => <div key={f.id} className="archived-folder"><span><FolderIcon size={17}/>{f.name}</span><button className="text-button" onClick={() => update(d => ({ ...d, folders: d.folders.map(x => x.id === f.id ? { ...x, archived: false } : x) }))}>Restore folder <RotateCcw size={15}/></button></div>)}<div className="set-grid collection-grid">{visibleSets.map((s, i) => <SetCard key={s.id} set={s} index={i} selectable/>)}{visibleSets.length === 0 && <div className="empty"><BookOpen size={30}/><h3>{query ? 'No words found' : 'No study sets'}</h3><p>{query ? 'Try another search.' : 'Create a set and add your first words.'}</p><button className="button primary" onClick={createSet}>Create set</button></div>}</div>
       </>}
@@ -529,8 +555,9 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
                 e.preventDefault();
                 first?.focus();
             }
-        } }}><div className="modal-heading"><div><h2 id="modal-title">{modal === 'share' ? 'Share set' : modal === 'save-set' ? 'Save sets to your account' : modal === 'folder' ? (editing ? 'Rename folder' : 'Create a folder') : modal === 'set' ? (editing ? 'Edit study set' : 'Create a study set') : modal === 'entry' ? (editing ? 'Edit word' : 'Add a word') : modal === 'import' ? 'Import vocabulary' : 'Account'}</h2></div><button autoFocus className="icon-button" aria-label="Close dialog" onClick={closeModal}><X size={22}/></button></div>
+        } }}><div className="modal-heading"><div><h2 id="modal-title">{modal === 'share' ? sharingFolder ? 'Share folder' : 'Share set' : modal === 'save-set' ? 'Save sets to your account' : modal === 'folder' ? (editing ? 'Rename folder' : 'Create a folder') : modal === 'set' ? (editing ? 'Edit study set' : 'Create a study set') : modal === 'entry' ? (editing ? 'Edit word' : 'Add a word') : modal === 'import' ? 'Import vocabulary' : 'Account'}</h2></div><button autoFocus className="icon-button" aria-label="Close dialog" onClick={closeModal}><X size={22}/></button></div>
       {modal === 'share' && sharingSet && <ShareSet key={`${libraryMeta.current.owner}:${sharingSet.id}`} set={sharingSet} entries={entries.filter(e => e.setId === sharingSet.id)} owner={libraryMeta.current.owner} signedIn={!!email} onAuth={signup => openAuth(signup)}/>}
+      {modal === 'share' && sharingFolder && <ShareSet key={`${libraryMeta.current.owner}:folder:${sharingFolder.id}`} set={sharingFolder} collectionSets={folderSharingSets.map(s => ({ id: s.id, name: s.name }))} entries={entries.filter(e => folderSharingSets.some(s => s.id === e.setId))} owner={libraryMeta.current.owner} signedIn={!!email} onAuth={signup => openAuth(signup)}/>}
       {modal === 'save-set' && <><p className="modal-intro">Without an account, this set is saved only in this browser. Clearing browser data will delete it.</p>{getClient() ? <><p className="modal-intro">Create an account to save new sets online and access them on other devices.</p><div className="account-prompt-actions"><button className="button primary full" onClick={() => openAuth(true, true)}>Create account</button><button className="button secondary full" onClick={() => openAuth(false, true)}>Sign in</button></div></> : <p className="modal-intro">Account sign-in is currently unavailable.</p>}<button className="button subtle full" onClick={() => setModal('set')}>Continue in this browser</button></>}
       {modal === 'set' && !email && <p className="modal-intro">This set will be saved only in this browser.</p>}
       {(modal === 'folder' || modal === 'set') && <form onSubmit={e => { e.preventDefault(); const form = new FormData(e.currentTarget); const name = String(form.get('name')).trim(); if (!name)

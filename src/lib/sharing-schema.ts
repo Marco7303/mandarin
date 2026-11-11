@@ -20,6 +20,8 @@ const sharedEntrySchema = z.object({
 });
 export const sharedDeckInputSchema = z.object({
     setId: id,
+    kind: z.enum(['set', 'folder']).optional(),
+    sets: z.array(z.object({ id, name: z.string().trim().min(1).max(200) })).min(1).max(100).optional(),
     name: z.string().trim().min(1).max(200),
     isPublic: z.boolean().optional(),
     description: z.string().trim().max(500).optional(),
@@ -29,7 +31,13 @@ export const sharedDeckInputSchema = z.object({
 }).superRefine((deck, ctx) => {
     if (deck.isPublic && !deck.creatorName)
         ctx.addIssue({ code: 'custom', message: 'Choose a public name before publishing.' });
-    if (deck.entries.some(entry => entry.setId !== deck.setId))
+    if (deck.kind === 'folder') {
+        const ids = new Set(deck.sets?.map(set => set.id));
+        if (!deck.sets?.length || ids.size !== deck.sets.length ||
+            deck.entries.some(entry => !ids.has(entry.setId)) ||
+            deck.sets.some(set => !deck.entries.some(entry => entry.setId === set.id)))
+            ctx.addIssue({ code: 'custom', message: 'Include 1–100 non-empty sets from this folder, with unique IDs.' });
+    } else if (deck.sets || deck.entries.some(entry => entry.setId !== deck.setId))
         ctx.addIssue({ code: 'custom', message: 'Only words from this set can be shared.' });
     if (new Set(deck.entries.map(entry => entry.id)).size !== deck.entries.length)
         ctx.addIssue({ code: 'custom', message: 'Duplicate word IDs are not allowed.' });
@@ -42,6 +50,8 @@ export const sharedDeckSchema = z.object({
     description: z.string().max(500).default(''),
     creatorName: z.string().max(50).default(''),
     suppressed: z.boolean().default(false),
+    kind: z.enum(['set', 'folder']).default('set'),
+    sets: z.array(z.object({ id, name: z.string().min(1).max(200) })).max(100).default([]),
 });
 export type SharedDeckInput = z.infer<typeof sharedDeckInputSchema>;
 export type SharedDeck = z.infer<typeof sharedDeckSchema>;
