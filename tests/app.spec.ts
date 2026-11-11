@@ -228,17 +228,17 @@ test('guest set creation explains browser storage and can be cancelled or contin
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
 
-test('cards toggle closed without saving an answer, and character pinyin stays separate', async ({page}) => {
+test('cards toggle closed without saving an answer, and character details stay separate', async ({page}) => {
  await page.setViewportSize({width:390,height:844});await page.goto('/');
  await page.getByRole('button',{name:'Study cards',exact:true}).click();
  await page.getByRole('button',{name:'Start studying',exact:true}).click();
  await page.getByRole('button',{name:'Reveal answer',exact:true}).click();
  await expect(page.getByRole('button',{name:'Hide answer',exact:true})).toHaveAttribute('aria-expanded','true');
- await page.getByRole('button',{name:'Show pinyin by character',exact:true}).click();
- await expect(page.locator('.character-alignment')).toBeVisible();
+ await page.locator('.character-explorer > summary').click();
+ await expect(page.locator('.character-reference')).toBeVisible();
  await page.getByRole('button',{name:'Hide answer',exact:true}).click();
  await expect(page.locator('.card-answer')).toHaveCount(0);
- await expect(page.locator('.character-alignment')).toHaveCount(0);
+ await expect(page.locator('.character-reference')).toHaveCount(0);
  await expect(page.getByRole('button',{name:'Know',exact:true})).toBeDisabled();
  await expect(page.getByRole('button',{name:'Still learning',exact:true})).toBeDisabled();
  await expect(page.locator('.session-header')).toContainText('1 / 20');
@@ -246,7 +246,7 @@ test('cards toggle closed without saving an answer, and character pinyin stays s
  // Native keyboard activation toggles the focused card exactly once.
  await page.getByRole('button',{name:'Reveal answer',exact:true}).press('Space');
  await expect(page.getByRole('button',{name:'Hide answer',exact:true})).toBeVisible();
- await expect(page.getByRole('button',{name:'Show pinyin by character',exact:true})).toHaveAttribute('aria-expanded','false');
+ await expect(page.locator('.character-explorer')).not.toHaveAttribute('open','');
  await page.getByRole('button',{name:'Hide answer',exact:true}).press('Space');
  await expect(page.getByRole('button',{name:'Reveal answer',exact:true})).toBeVisible();
  await page.getByRole('button',{name:'Reveal answer',exact:true}).click();
@@ -322,4 +322,91 @@ test('guests cannot publish shared links',async({page})=>{
  await expect(page.getByRole('dialog').getByRole('heading',{name:'Share set',exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'Create link',exact:true})).toHaveCount(0);
  expect(published).toBe(0);
+});
+
+test('character reference is optional, navigable, keyboard-safe and available offline', async ({page, context}) => {
+ await page.setViewportSize({width:390,height:844});
+ const external: string[]=[];
+ page.on('request', r=>{if(r.url().includes('dong-chinese.com')) external.push(r.url());});
+ await page.goto('/');
+ await page.getByRole('button',{name:'Study cards',exact:true}).click();
+ await page.getByRole('button',{name:'Start studying',exact:true}).click();
+ await expect(page.locator('.character-explorer')).toHaveCount(0);
+ await page.getByRole('button',{name:'Reveal answer',exact:true}).click();
+ await page.locator('.character-explorer > summary').press('Space');
+ const reference=page.getByRole('article',{name:'Character reference for 你'});
+ await expect(reference).toContainText('Verified on Dong Chinese');
+ await expect(reference).toContainText('亻');
+ await reference.getByText('Common words',{exact:true}).click();
+ await expect(reference.getByText('你好',{exact:true})).toBeVisible();
+ await reference.getByText('Stroke order',{exact:true}).click();
+ await expect(page.getByRole('img',{name:'Stroke order for 你: 7 of 7 strokes'})).toBeVisible();
+ await page.screenshot({path:'test-results/character-strokes-mobile.png',fullPage:true});
+ await page.getByRole('button',{name:'Reset strokes'}).click();
+ await page.getByRole('button',{name:'Next stroke',exact:true}).press('ArrowRight');
+ await expect(page.locator('.session-header')).toContainText('1 / 20');
+ await page.getByRole('button',{name:'Next stroke',exact:true}).click();
+ await expect(page.getByRole('img',{name:'Stroke order for 你: 1 of 7 strokes'})).toBeVisible();
+ await page.getByRole('button',{name:'Play',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Pause',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Pause',exact:true}).click();
+ await reference.getByRole('button',{name:'Explore component 亻',exact:true}).click();
+ await expect(page.getByRole('article',{name:'Character reference for 亻'})).toBeVisible();
+ await page.getByRole('button',{name:'Explore 你',exact:true}).click();
+ await expect(reference).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ expect(external).toEqual([]);
+ expect(await page.evaluate(()=>Object.keys(JSON.parse(localStorage.getItem('mori-v2:guest')!).state.progress).length)).toBe(0);
+ await page.screenshot({path:'test-results/character-details-mobile.png',fullPage:true});
+ // Clear in-memory modules by reloading. Public dictionary shards survive in CacheStorage.
+ await page.reload();
+ await context.setOffline(true);
+ await page.getByRole('button',{name:'Study cards',exact:true}).click();
+ await page.getByRole('button',{name:'Start studying',exact:true}).click();
+ await page.getByRole('button',{name:'Reveal answer',exact:true}).click();
+ await page.locator('.character-explorer > summary').click();
+ await expect(reference).toContainText('Verified on Dong Chinese');
+ await reference.getByText('Stroke order',{exact:true}).click();
+ await expect(page.getByRole('img',{name:'Stroke order for 你: 7 of 7 strokes'})).toBeVisible();
+ await context.setOffline(false);
+});
+
+test('character reference failures retry without interrupting study', async ({page, context}) => {
+ await page.goto('/');
+ await context.setOffline(true);
+ await page.getByRole('button',{name:'Study cards',exact:true}).click();
+ await page.getByRole('button',{name:'Start studying',exact:true}).click();
+ await page.getByRole('button',{name:'Reveal answer',exact:true}).click();
+ await page.locator('.character-explorer > summary').click();
+ await expect(page.getByText(/Character details couldn’t load/)).toBeVisible();
+ await context.setOffline(false);
+ await page.getByRole('button',{name:'Try again',exact:true}).click();
+ await expect(page.getByRole('article',{name:'Character reference for 你'})).toBeVisible();
+ await page.getByRole('button',{name:'Know',exact:true}).click();
+ await expect(page.locator('.session-header')).toContainText('2 / 20');
+ await expect(page.locator('.character-explorer')).toHaveCount(0);
+});
+
+test('word editor explores exact traditional characters, deduplicates them and handles missing references', async ({page}) => {
+ await page.setViewportSize({width:1440,height:1000});
+ await page.goto('/');
+ await page.locator('.set-open').first().click();
+ await page.getByRole('button',{name:'Add word',exact:true}).click();
+ await page.getByLabel('Traditional Chinese',{exact:true}).fill('謝謝，學𱍐');
+ await page.locator('.character-explorer > summary').click();
+ await expect(page.getByRole('group',{name:'Choose a character'}).getByRole('button')).toHaveCount(3);
+ const thanks=page.getByRole('article',{name:'Character reference for 謝'});
+ await expect(thanks).toContainText('言 represents the meaning and 射 represents the sound');
+ await thanks.getByText('Common words',{exact:true}).click();
+ await expect(thanks.getByText('謝謝',{exact:true})).toBeVisible();
+ await thanks.getByText('Historical forms',{exact:true}).click();
+ await expect(thanks.getByRole('link',{name:'View evolution on Dong Chinese'})).toHaveAttribute('href','https://www.dong-chinese.com/wiki/%E8%AC%9D');
+ await page.screenshot({path:'test-results/character-details-desktop.png',fullPage:true});
+ await page.getByRole('button',{name:'Explore 學',exact:true}).click();
+ await expect(page.getByRole('article',{name:'Character reference for 學'})).toBeVisible();
+ await page.getByRole('button',{name:'Explore 𱍐',exact:true}).click();
+ await expect(page.getByText('No local reference for this character.')).toBeVisible();
+ await expect(page.getByRole('link',{name:'Look up 𱍐 on Dong Chinese'})).toBeVisible();
+ await page.getByRole('button',{name:'Close dialog'}).click();
+ await expect(page.locator('.word-row')).toHaveCount(55);
 });

@@ -1,4 +1,4 @@
-const CACHE = 'mori-shell-v9';
+const CACHE = 'mori-shell-v10';
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
@@ -19,7 +19,7 @@ self.addEventListener('install', event => {
 });
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
-    await Promise.all((await caches.keys()).filter(k => k !== CACHE).map(k => caches.delete(k)));
+    await Promise.all((await caches.keys()).filter(k => k !== CACHE && k !== 'mori-character-data-v1').map(k => caches.delete(k)));
     await self.clients.claim();
   })());
 });
