@@ -1303,7 +1303,7 @@ fieldset legend {
   font-size:12px;
   color:#7c8b70;
 }
-.modal input:not([type=checkbox]),.modal textarea,.modal select,.setup-panel select,.shared-save-actions select {
+.modal input:not([type=checkbox]):not([type=radio]),.modal textarea,.modal select,.setup-panel select,.shared-save-actions select {
   width:100%;
   border:1px solid #dfe5d7;
   border-radius:6px;
@@ -2367,7 +2367,7 @@ select {
   .modal .form-two {
     gap:11px;
   }
-  .modal input:not([type=checkbox]),.modal textarea,.modal select {
+  .modal input:not([type=checkbox]):not([type=radio]),.modal textarea,.modal select {
     font-size:16px;
   }
   .modal .form-two label {
@@ -2827,3 +2827,53 @@ select {
 @keyframes character-stroke { from { stroke-dashoffset:1; } to { stroke-dashoffset:0; } }
 @media(prefers-reduced-motion:reduce) { .stroke-draw { animation:none; } }
 @media(max-width:600px) { .character-reference { padding:0 17px 17px; } .character-overview h3 { font-size:15px; } }
+/* Public sets use the same restrained cards and controls as the personal library. */
+.explore-search { display: flex; gap: 12px; margin-bottom: 34px; }
+.explore-search .search { flex: 1; width: auto; max-width: none; min-width: 0; padding: 0 14px; background: #fff; border: 1px solid var(--line); border-radius: 9px; }
+.explore-search .search svg { flex-shrink: 0; }
+.explore-search .search input { font-size: 14px; }
+.explore-search input { width: 100%; min-width: 0; }
+.explore-results { margin-bottom: 18px; gap: 12px; }
+.explore-grid { align-items: stretch; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.public-set-card { display: flex; flex-direction: column; min-height: 220px; padding: 25px; background: var(--white, #fff); border: 1px solid var(--border, #e1e6dc); border-radius: 16px; color: inherit; text-decoration: none; transition: border-color .15s, box-shadow .15s; overflow-wrap: anywhere; }
+.public-set-card:hover { border-color: #819577; box-shadow: 0 5px 20px #273e2c08; }
+.public-set-card:focus-visible { outline: 2px solid #587349; outline-offset: 4px; }
+.public-set-top, .public-set-bottom { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13px; color: #697762; }
+.public-word-count { display: flex; align-items: center; gap: 7px; }
+.public-saved { font-size: 11px; background: #eef2e8; border-radius: 6px; padding: 4px 7px; }
+.public-set-card h3 { margin: 24px 0 10px; font-size: 21px; font-weight: 500; }
+.public-set-card > p { color: #697762; font-size: 14px; line-height: 1.6; margin: 0 0 20px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.public-set-bottom { margin-top: auto; padding-top: 18px; }
+.public-set-bottom > span { max-width: 85%; }
+.explore-empty { padding: 45px 20px; text-align: center; border: 1px dashed #d8dfd0; border-radius: 16px; color: #697762; margin-bottom: 24px; }
+.explore-empty h3 { color: #29382f; margin: 15px 0 8px; font-weight: 500; }
+.explore-empty p { line-height: 1.6; margin-bottom: 20px; }
+.explore-empty .button { display: inline-flex; }
+.explore-loading { padding: 24px 0; color: #697762; }
+.share-visibility { border: 0; padding: 0; margin: 0 0 24px; min-width: 0; }
+.share-visibility legend { font-size: 13px; margin-bottom: 10px; }
+.share-visibility label { display: flex; align-items: center; gap: 12px; padding: 13px 14px; border: 1px solid #dce2d5; border-radius: 10px; margin-bottom: 8px; cursor: pointer; }
+.share-visibility label:has(input:checked) { border-color: #819577; background: #f4f6ef; }
+.modal .share-visibility input[type=radio] { margin: 0; padding: 0; min-height: 17px; width: 17px; height: 17px; accent-color: #587349; flex-shrink: 0; }
+.share-visibility strong, .share-visibility small { display: block; }
+.share-visibility strong { font-size: 14px; font-weight: 500; }
+.share-visibility small { font-size: 12px; line-height: 1.5; color: #697762; margin-top: 3px; }
+.publish-fields label, .report-set label { display: block; font-size: 13px; margin-bottom: 12px; }
+.publish-fields input, .publish-fields textarea, .report-set textarea, .report-set select { display: block; width: 100%; margin-top: 7px; border: 1px solid #dce2d5; border-radius: 8px; padding: 11px; background: #fff; color: inherit; font: inherit; }
+.publish-fields textarea, .report-set textarea { resize: vertical; }
+.optional-label { color: #7b8673; font-size: 12px; font-weight: 400; }
+.public-description { max-width: 65ch; overflow-wrap: anywhere; white-space: pre-wrap; }
+.report-set { margin-top: 36px; padding-top: 20px; border-top: 1px solid #e1e6dc; font-size: 13px; }
+.report-set > .text-button { color: #697762; font-size: 13px; }
+.report-set form { margin-top: 18px; max-width: 440px; }
+.shared-word-details { grid-column: 2 / -1; }
+.shared-word-details .character-explorer > summary { justify-content: flex-start; padding: 10px 0 0; }
+@media (max-width: 600px) {
+  .explore-grid { grid-template-columns: 1fr; }
+  .explore-search .search input { font-size: 16px; }
+  .explore-search { gap: 8px; }
+  .explore-search .button { padding-inline: 16px; }
+  .explore-results { align-items: baseline; }
+  .explore-results > span { font-size: 12px; }
+  .public-set-card { min-height: 200px; padding: 22px; }
+}

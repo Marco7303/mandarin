@@ -1,9 +1,10 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDownToLine, ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, ChevronRight, Folder as FolderIcon, Home, Leaf, MoreHorizontal, Plus, Search, Settings, Sparkles, Star, Upload, X, RotateCcw, WifiOff, Cloud, Archive, Pencil, Copy, Trash2, Share2 } from 'lucide-react';
+import { ArrowDownToLine, ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, ChevronRight, Folder as FolderIcon, Home, Leaf, MoreHorizontal, Plus, Search, Settings, Sparkles, Star, Upload, X, RotateCcw, WifiOff, Cloud, Archive, Pencil, Copy, Trash2, Share2, Compass } from 'lucide-react';
 import seed from '@/data/unit1.json';
 import { CharacterExplorer } from './character-explorer';
 import { ShareSet, SharedSetPreview } from './set-sharing';
+import { Explore } from './explore';
 import type { SharedDeck } from '@/lib/sharing-schema';
 import { buildQueue, isLearned, makeEntry, normalizeStudyPreferences, recordAnswer, resetProgress, searchEntry, type Entry, type Direction, type Progress } from '@/lib/core';
 import { parseFile, parseText, exportCSV, validateEntries, type ImportResult } from '@/lib/importer';
@@ -34,7 +35,7 @@ type State = {
     stars: Record<string, boolean>;
     preferences: Preferences;
 };
-type Screen = 'home' | 'sets' | 'detail' | 'setup' | 'session' | 'result' | 'settings' | 'shared';
+type Screen = 'home' | 'sets' | 'detail' | 'setup' | 'session' | 'result' | 'settings' | 'shared' | 'explore';
 type Prompt = {
     entryId: string;
     direction: Direction;
@@ -51,6 +52,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 export default function MandarinApp({ shareId }: { shareId?: string }) {
     const [incomingShareId, setIncomingShareId] = useState(shareId || '');
     const [sharingSetId, setSharingSetId] = useState('');
+    const [sharedFromExplore, setSharedFromExplore] = useState(false);
     const [data, setData] = useState<State>(initialState);
     const [ready, setReady] = useState(false);
     const [screen, setScreen] = useState<Screen>('home');
@@ -136,7 +138,7 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
         setAnswers([]);
         const linkId = window.location.pathname.match(/^\/share\/([^/]+)\/?$/)?.[1];
         if (linkId) setIncomingShareId(linkId);
-        setScreen(linkId ? 'shared' : 'home');
+        setScreen(linkId ? 'shared' : window.location.pathname.replace(/\/$/, '') === '/explore' ? 'explore' : 'home');
         setModal(null);
         setReady(true);
         return state;
@@ -359,7 +361,7 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
     const starred = Object.values(data.stars).filter(Boolean).length;
     const notify = (message: string) => setToast(message);
     const update = (fn: (previous: State) => State) => setData(fn);
-    function navigate(next: Screen) { if (window.location.pathname.startsWith('/share/')) window.history.replaceState(null, '', '/'); setScreen(next); setMenu(null); setQuery(''); window.scrollTo(0, 0); }
+    function navigate(next: Screen) { if (next !== 'shared') window.history.replaceState(null, '', next === 'explore' ? '/explore' : '/'); setScreen(next); setMenu(null); setQuery(''); window.scrollTo(0, 0); }
     function openSet(id: string) { setSelectedSets([id]); navigate('detail'); }
     function setup(ids = selectedSets, filter = 'Learning') { setSelectedSets(ids);
         update(d => ({ ...d, preferences: { ...d.preferences, filter, ...(filter === 'Starred' ? { prompt: 'mixed' as const } : {}) } })); navigate('setup'); }
@@ -460,7 +462,7 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
     <a className="skip-link" href="#main-content">Skip to content</a><aside className={cn('sidebar', isStudy && 'study-sidebar')}>
       <a className="brand" href="#" onClick={e => { e.preventDefault(); navigate('home'); }}><span className="brand-mark" lang="zh-Hant-TW">森</span><span>mori<span className="brand-dot">.</span></span></a>
       <span className="sidebar-caption">MANDARIN FLASHCARDS</span>
-      <nav aria-label="Main navigation">{([{ id: 'home', label: 'Home', icon: Home }, { id: 'setup', label: 'Study', icon: Sparkles }] as const).map(item => <button key={item.id} className={cn('nav-item', (screen === item.id || (item.id === 'setup' && isStudy)) && 'active')} onClick={() => item.id === 'setup' ? setup(activeSets.map(s => s.id)) : navigate(item.id)}><item.icon size={20}/>{item.label}</button>)}</nav>
+      <nav aria-label="Main navigation">{([{ id: 'home', label: 'Home', icon: Home }, { id: 'setup', label: 'Study', icon: Sparkles }, { id: 'explore', label: 'Explore', icon: Compass }] as const).map(item => <button key={item.id} className={cn('nav-item', (screen === item.id || (item.id === 'setup' && isStudy)) && 'active')} onClick={() => item.id === 'setup' ? setup(activeSets.map(s => s.id)) : navigate(item.id)}><item.icon size={20}/>{item.label}</button>)}</nav>
       <nav className="sidebar-library" aria-label="Library"><div className="section-eyebrow">LIBRARY <button aria-label="Create folder" onClick={() => { setEditing(null); setModal('folder'); }}><Plus size={16}/></button></div><button className={cn('nav-item', screen === 'sets' && activeFolder === 'all' && 'active')} aria-current={screen === 'sets' && activeFolder === 'all' ? 'page' : undefined} onClick={() => { setActiveFolder('all'); navigate('sets'); }}><BookOpen size={20}/>All sets<span className="nav-count">{activeSets.length}</span></button>{folders.map(folder => <button className={cn('nav-item', 'folder-link', ((screen === 'sets' && activeFolder === folder.id) || (screen === 'detail' && activeSet?.folderId === folder.id)) && 'active')} aria-current={screen === 'sets' && activeFolder === folder.id ? 'page' : undefined} key={folder.id} onClick={() => { setActiveFolder(folder.id); navigate('sets'); }}><FolderIcon size={17}/><span>{folder.name}</span></button>)}</nav>
       <div className="sidebar-bottom"><button className={cn('nav-item', screen === 'settings' && 'active')} onClick={() => navigate('settings')}><Settings size={19}/>Settings</button><button className="profile" aria-label="Account" onClick={() => openAuth()}><span className="avatar">{email ? email[0].toUpperCase() : '學'}</span><span><strong>{email ? email.split('@')[0] : 'Account'}</strong><small>{email ? 'Personal account' : 'Not signed in'}</small></span><ChevronRight size={16}/></button></div>
     </aside>
@@ -471,7 +473,8 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
       <main id="main-content" className={cn('main', isStudy && 'session-main')}>
       {ready && !email && !isStudy && <section className="guest-notice" aria-label="Browser-only storage"><div><strong>Saved only in this browser</strong><p>Clearing browser data will delete your sets and progress.</p></div>{getClient() && <button className="button primary small" onClick={() => openAuth(true)}>Create account</button>}</section>}
       {!ready ? <div className="loading"><Leaf className="loading-leaf"/>Loading…</div> : <>
-      {screen === 'shared' && incomingShareId && <SharedSetPreview key={`${incomingShareId}:${libraryMeta.current.owner}`} id={incomingShareId} folders={folders} existing={sharedCopy} signedIn={!!email} canSave={!email || (syncReady.current && !syncConflict)} onSave={saveSharedSet} onOpen={id => { if (sharedCopy?.archived || data.folders.find(f => f.id === sharedCopy?.folderId)?.archived) { update(d => ({ ...d, sets: d.sets.map(s => s.id === id ? { ...s, archived: false } : s), folders: d.folders.map(f => f.id === sharedCopy?.folderId ? { ...f, archived: false } : f) })); } openSet(id); }} onHome={() => navigate('home')}/>}
+      {(screen === 'explore' || (screen === 'shared' && sharedFromExplore)) && <div hidden={screen !== 'explore'}><Explore savedIds={data.sets.filter(s => !s.archived && !data.folders.find(f => f.id === s.folderId)?.archived).flatMap(s => s.sourceShareId ? [s.sourceShareId] : [])} onOpen={id => { setIncomingShareId(id); setSharedFromExplore(true); window.history.replaceState(null, '', `/share/${id}`); navigate('shared'); }} onLibrary={() => { setActiveFolder('all'); navigate('sets'); }}/></div>}
+      {screen === 'shared' && incomingShareId && <SharedSetPreview key={`${incomingShareId}:${libraryMeta.current.owner}`} id={incomingShareId} folders={folders} existing={sharedCopy} signedIn={!!email} canSave={!email || (syncReady.current && !syncConflict)} onSave={saveSharedSet} onOpen={id => { if (sharedCopy?.archived || data.folders.find(f => f.id === sharedCopy?.folderId)?.archived) { update(d => ({ ...d, sets: d.sets.map(s => s.id === id ? { ...s, archived: false } : s), folders: d.folders.map(f => f.id === sharedCopy?.folderId ? { ...f, archived: false } : f) })); } openSet(id); }} owner={libraryMeta.current.owner} onAuth={() => openAuth(false)} backToExplore={sharedFromExplore} onHome={() => navigate(sharedFromExplore ? 'explore' : 'home')}/>}
       {screen === 'home' && <>
         <div className="page-heading"><div><h1>Your study space</h1></div><span className="date-label">{new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', weekday: 'short' })}</span></div>
         <section className="daily-card"><div className="daily-copy"><h2>Study cards</h2><p>{learning > 0 ? `${learning} words in Learning · ${labels[data.preferences.prompt]}` : 'All cards learned for the selected front.'}</p><button className="button primary" onClick={() => setup(activeSets.map(s => s.id), 'Learning')}>Study cards <ArrowRight size={18}/></button></div><div className="daily-character" aria-hidden="true"><span lang="zh-Hant-TW">學</span><div><i />xué <i /></div><small>to learn</small></div></section>
@@ -510,7 +513,7 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
             openAuth(); }}>{email ? 'Sign out' : 'Sign in'}</button></div>{!getClient() && <p className="settings-note">Account sync is unavailable. Progress is saved on this device.</p>}{email && !syncConflict && <button className="text-button" onClick={() => void connectCloud()}>Sync now</button>}{syncConflict && <div role="alert"><p className="settings-note">This device and the cloud both changed. Export your words before replacing either copy.</p><div className="heading-actions"><button className="button secondary" onClick={() => void resolveSync(true)}>Keep this device</button><button className="button secondary" onClick={() => void resolveSync(false)}>Use cloud copy</button></div></div>}</section><section className="settings-section"><h2>Your vocabulary</h2><div className="settings-row"><div><strong>Export vocabulary</strong><p>Download all words as CSV.</p></div><button className="button secondary" onClick={() => exportEntries(entries, 'mori-vocabulary')}><ArrowDownToLine size={17}/>Export all</button></div><div className="settings-row"><div><strong>Import vocabulary</strong><p>Import a spreadsheet or paste a list.</p></div><button className="button secondary" onClick={() => { setImportResult(null); setModal('import'); }}><Upload size={17}/>Import</button></div></section><section className="settings-section"><h2>Install Mori</h2><p className="settings-note">In your browser menu, choose “Install app” or “Add to Home Screen”. Open Mori once online to keep studying offline.</p></section><section className="settings-section credits"><h2>About Mori</h2><p>Taiwanese Mandarin · Traditional Chinese</p><p>Chinese typeface: 教育部標準楷書 · 中華民國教育部<br />CC BY-ND 3.0 TW. Font redistributed unchanged.</p><a href="https://cc-cedict.org/" target="_blank" rel="noreferrer">CC-CEDICT attribution <ArrowRight size={14}/></a><a href="https://creativecommons.org/licenses/by-nd/3.0/tw/" target="_blank" rel="noreferrer">Font licence <ArrowRight size={14}/></a><p>Character reference: Dong Chinese Character Wiki · CC BY-SA 4.0. Stroke graphics: Make Me a Hanzi · Arphic Public License. Historical images open on the source site.</p><a href="/character-data/README.txt" target="_blank" rel="noreferrer">Character data & licences <ArrowRight size={14}/></a><p>Optional dictionary: CC-CEDICT · CC BY-SA 4.0. Suggestions appear in the word editor when a local corpus is configured.</p></section></div></>}
       </>}
       </main>
-      {!isStudy && <nav className="bottom-nav" aria-label="Mobile navigation">{([{ id: 'home', label: 'Home', icon: Home }, { id: 'sets', label: 'Sets', icon: BookOpen }, { id: 'setup', label: 'Study', icon: Sparkles }, { id: 'settings', label: 'Settings', icon: Settings }] as const).map(item => <button key={item.id} className={cn((screen === item.id || (screen === 'detail' && item.id === 'sets')) && 'active')} onClick={() => item.id === 'setup' ? setup(activeSets.map(s => s.id)) : navigate(item.id)}><item.icon size={21}/><span>{item.label}</span></button>)}</nav>}
+      {!isStudy && <nav className="bottom-nav" aria-label="Mobile navigation">{([{ id: 'home', label: 'Home', icon: Home }, { id: 'sets', label: 'Sets', icon: BookOpen }, { id: 'setup', label: 'Study', icon: Sparkles }, { id: 'explore', label: 'Explore', icon: Compass }, { id: 'settings', label: 'Settings', icon: Settings }] as const).map(item => <button key={item.id} className={cn((screen === item.id || (screen === 'detail' && item.id === 'sets')) && 'active')} onClick={() => item.id === 'setup' ? setup(activeSets.map(s => s.id)) : navigate(item.id)}><item.icon size={21}/><span>{item.label}</span></button>)}</nav>}
     </div>
     {toast && <div className="toast" role="status"><Check size={17}/>{toast}</div>}
     {modal && <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget)

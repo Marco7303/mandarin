@@ -263,6 +263,74 @@ const sharedWords = [
 ];
 const sharedSet = {id:sharedId,name:'Shared class words',entries:sharedWords,updatedAt:'2026-11-07T10:00:00.000Z'};
 
+test('Explore searches and paginates public sets, previews character details and saves a separate copy',async({page})=>{
+ await page.setViewportSize({width:390,height:844});
+ const publicDeck={...sharedSet,isPublic:true,description:'Vocabulary for class',creatorName:'Class learner'};
+ const summary={id:sharedId,name:publicDeck.name,description:publicDeck.description,creatorName:publicDeck.creatorName,wordCount:2,updatedAt:publicDeck.updatedAt};
+ const secondId='c3278291-32e0-4dbb-bbcb-013968d04c98';
+ const searches:string[]=[];
+ await page.route('**/api/community?**',route=>{
+  const url=new URL(route.request().url());searches.push(url.search);
+  const q=url.searchParams.get('q');
+  return route.fulfill({json:q==='nothing'?{sets:[],nextCursor:null}:url.searchParams.has('cursor')?{sets:[{...summary,id:secondId,name:'Second set'}],nextCursor:null}:{sets:[summary],nextCursor:`2026-11-07T10:00:00.000Z|${sharedId}`}});
+ });
+ await page.route(`**/api/shares/${sharedId}`,route=>route.fulfill({json:publicDeck}));
+ await page.goto('/explore');
+ await expect(page.getByRole('heading',{name:'Explore',exact:true})).toBeVisible();
+ await expect(page.getByRole('link',{name:/Shared class words/})).toBeVisible();
+ await expect(page.getByText('By Class learner',{exact:true})).toBeVisible();
+ expect(searches).toHaveLength(1);
+ await page.getByRole('button',{name:'Show more sets',exact:true}).click();
+ await expect(page.getByRole('link',{name:/Second set/})).toBeVisible();
+ await page.getByRole('textbox',{name:'Search public sets'}).fill('nothing');
+ await page.getByRole('button',{name:'Search',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'No matching sets',exact:true})).toBeVisible();
+ await page.getByRole('textbox',{name:'Search public sets'}).fill('class');
+ await page.getByRole('button',{name:'Search',exact:true}).click();
+ await expect(page.getByRole('link',{name:/Shared class words/})).toBeVisible();
+ await page.screenshot({path:'test-results/explore-mobile.png',fullPage:true});
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+ await page.getByRole('link',{name:/Shared class words/}).click();
+ await expect(page.getByRole('heading',{name:sharedSet.name,exact:true})).toBeVisible();
+ await expect(page.getByText('PUBLIC SET',{exact:true})).toBeVisible();
+ await page.getByText('Character details',{exact:true}).first().click();
+ await expect(page.getByRole('article',{name:'Character reference for 學'})).toBeVisible();
+ await page.getByRole('button',{name:'Report this set',exact:true}).click();
+ await expect(page.getByText('Sign in to report a set.')).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+ await page.screenshot({path:'test-results/explore-preview-mobile.png',fullPage:true});
+ await page.getByRole('button',{name:'Explore',exact:true}).last().click();
+ await expect(page.getByRole('textbox',{name:'Search public sets'})).toHaveValue('class');
+ await page.getByRole('link',{name:/Shared class words/}).click();
+ await page.getByRole('button',{name:'Add to library',exact:true}).click();
+ await expect(page.getByRole('heading',{name:sharedSet.name+'.',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Explore',exact:true}).first().click();
+ await expect(page.getByRole('link',{name:/Shared class words/})).toContainText('In your library');
+ const state=await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state);
+ expect(state.sets.filter((s:{sourceShareId?:string})=>s.sourceShareId===sharedId)).toHaveLength(1);
+ expect(state.progress).toEqual({});
+ await page.setViewportSize({width:1440,height:1000});
+ await page.screenshot({path:'test-results/explore-desktop.png',fullPage:true});
+});
+
+test('Explore handles offline failure, retry and an empty community without changing the library',async({page,context})=>{
+ let fail=true,offline=false;
+ await page.route('**/api/community?**',route=>offline?route.abort('internetdisconnected'):route.fulfill(fail?{status:503,json:{error:'Unavailable'}}:{json:{sets:[],nextCursor:null}}));
+ await page.goto('/explore');
+ await expect(page.locator('.explore-page [role=alert]')).toContainText('Could not load public sets');
+ fail=false;await page.getByRole('button',{name:'Try again',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'No public sets yet',exact:true})).toBeVisible();
+ const before=await page.evaluate(()=>localStorage.getItem('mori-v2:guest'));
+ await page.getByRole('button',{name:'Open your library',exact:true}).click();
+ offline=true;await context.setOffline(true);
+ await page.getByRole('button',{name:'Explore',exact:true}).click();
+ await expect(page.locator('.explore-page [role=alert]')).toContainText('Connect to the internet');
+ offline=false;await context.setOffline(false);
+ await page.getByRole('button',{name:'Try again',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'No public sets yet',exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>localStorage.getItem('mori-v2:guest'))).toBe(before);
+});
+
 test('shared set preview saves an independent copy, studies offline and avoids duplicate copies',async({page,context})=>{
  await page.setViewportSize({width:390,height:844});
  await page.route(`**/api/shares/${sharedId}`,route=>route.fulfill({json:sharedSet}));

@@ -1,4 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
+import type { SharedDeck } from '../src/lib/sharing-schema';
+import seed from '../src/data/unit1.json';
 
 // Keep HTTP fixtures in Playwright's routing layer. The separate app suite
 // exercises the real service worker and offline storage.
@@ -55,6 +57,7 @@ async function installCloudFixture(page: Page) {
         libraries.set(owner, saved);
         return route.fulfill({ json: { revision: saved.revision, updatedAt: saved.updatedAt } });
     });
+    await page.route('**/api/community/profile', route => route.fulfill({ json: { displayName: '' } }));
     return { libraries, unexpected, setFailWrites(value: boolean) { failWrites = value; }, setRestricted(value: boolean) { restricted = value; } };
 }
 async function openSignIn(page: Page) {
@@ -68,6 +71,90 @@ async function signIn(page: Page, email: string, password = 'password123') {
     await page.getByRole('button', { name: 'Sign in', exact: true }).last().click();
 }
 async function settings(page: Page) { await page.getByRole('button', { name: 'Settings', exact: false }).first().click(); }
+
+test('public publishing lets an existing account choose a name, update visibility and keep all personal data', async ({ page }) => {
+    const fixture = await installCloudFixture(page);
+    await page.goto('/', { waitUntil: 'domcontentloaded' });
+    // This account predates public profiles and already has its own library and progress.
+    const state = {
+        folders: [{ id: 'mandarin-class', name: 'Mandarin Class' }],
+        sets: [{ id: 'unit-1', folderId: 'mandarin-class', name: 'Existing account set' }],
+        entries: seed, stars: {},
+        progress: { [`${seed[0].id}:chinese`]: { reviewCount: 1, correctCount: 1, incorrectCount: 0, consecutiveCorrect: 1, stage: 1, lastResult: 'know', lastReviewed: '2026-11-10T12:00:00.000Z' } },
+        preferences: { prompt: 'chinese', filter: 'Learning', order: 'Original', amount: '20' },
+    };
+    fixture.libraries.set('existing@example.com', { state, revision: 7, updatedAt: '2026-11-10T12:00:00.000Z' });
+    let share: SharedDeck | null = null, publicName = '';
+    const writes: Record<string, unknown>[] = [];
+    await page.route('**/api/community/profile', route => route.fulfill({ json: { displayName: publicName } }));
+    await page.route('**/api/shares**', route => {
+        if (route.request().method() === 'GET') return route.fulfill({ json: { share } });
+        if (route.request().method() === 'DELETE') { share = null; return route.fulfill({ json: { success: true } }); }
+        const body = route.request().postDataJSON(); writes.push(body); publicName = body.creatorName || publicName;
+        share = { ...body, id: 'a3278291-32e0-4dbb-bbcb-013968d04c98', updatedAt: new Date().toISOString(), suppressed: false };
+        return route.fulfill({ json: share });
+    });
+    await signIn(page, 'existing@example.com');
+    await expect(page.locator('.set-open').first()).toContainText('Existing account set');
+    const before = JSON.stringify(fixture.libraries.get('existing@example.com'));
+    await page.locator('.set-open').first().click();
+    await page.getByRole('button', { name: 'Share', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('radio', { name: /Anyone with the link/ })).toBeChecked();
+    await dialog.getByRole('radio', { name: /^Public/ }).check();
+    await expect(dialog.getByRole('textbox', { name: 'Public name', exact: true })).toHaveValue('');
+    await expect(dialog.getByRole('button', { name: 'Publish set', exact: true })).toBeDisabled();
+    await dialog.getByRole('textbox', { name: 'Public name', exact: true }).fill('Taiwan learner');
+    await dialog.getByRole('textbox', { name: 'Set description', exact: true }).fill('Everyday class vocabulary');
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: 'test-results/publish-mobile.png', fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await dialog.getByRole('button', { name: 'Publish set', exact: true }).click();
+    await expect(dialog.getByRole('status')).toHaveText('Published in Explore.');
+    expect(writes).toHaveLength(1);
+    expect(writes[0]).toMatchObject({ isPublic: true, creatorName: 'Taiwan learner', description: 'Everyday class vocabulary' });
+    expect(JSON.stringify(writes)).not.toContain('existing@example.com');
+    expect(writes[0]).not.toHaveProperty('progress');
+    await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click();
+    await page.getByRole('button', { name: 'Share', exact: true }).click();
+    await expect(dialog.getByRole('radio', { name: /^Public/ })).toBeChecked();
+    await expect(dialog.getByRole('textbox', { name: 'Public name', exact: true })).toHaveValue('Taiwan learner');
+    await dialog.getByRole('radio', { name: /Anyone with the link/ }).check();
+    await dialog.getByRole('button', { name: 'Save as unlisted', exact: true }).click();
+    await expect(dialog.getByRole('status')).toContainText('Only people with the link');
+    expect(writes[1].isPublic).toBe(false);
+    await expect(dialog.getByLabel('Share link', { exact: true })).toHaveValue(/a3278291-32e0-4dbb-bbcb-013968d04c98$/);
+    expect(JSON.stringify(fixture.libraries.get('existing@example.com'))).toBe(before);
+    expect(fixture.unexpected).toEqual([]);
+});
+
+test('signed-in learners can report public sets without adding them or exposing account details', async ({ page }) => {
+    const fixture = await installCloudFixture(page);
+    await page.goto('/', { waitUntil: 'domcontentloaded' }); await signIn(page, 'reporter@example.com');
+    await expect(page.getByRole('button', { name: 'Account', exact: true })).toContainText('reporter');
+    await expect.poll(() => fixture.libraries.get('reporter@example.com')?.revision).toBe(1);
+    const before = JSON.stringify(fixture.libraries.get('reporter@example.com'));
+    const id = 'a3278291-32e0-4dbb-bbcb-013968d04c98';
+    await page.route(`**/api/shares/${id}`, route => route.fulfill({ json: {
+        id, name: 'Public words', updatedAt: new Date().toISOString(), isPublic: true, creatorName: 'Learner',
+        entries: [{ id: 'one', setId: 'source', traditional: '學', english: 'learn', pinyin: 'xué' }],
+    } }));
+    let report: unknown;
+    await page.route(`**/api/community/${id}/report`, route => {
+        expect(route.request().headers()['x-mori-owner']).toBe('reporter@example.com');
+        expect(route.request().headers().authorization).toMatch(/^Bearer stackauth_/);
+        report = route.request().postDataJSON(); return route.fulfill({ json: { success: true } });
+    });
+    await page.goto(`/share/${id}`, { waitUntil: 'domcontentloaded' });
+    await page.getByRole('button', { name: 'Report this set', exact: true }).click();
+    await page.getByRole('combobox', { name: 'Reason', exact: true }).selectOption('Inaccurate content');
+    await page.getByLabel('Details optional').fill('Please check this pronunciation.');
+    await page.getByRole('button', { name: 'Send report', exact: true }).click();
+    await expect(page.getByText('Report received.', { exact: true })).toBeVisible();
+    expect(report).toEqual({ reason: 'Inaccurate content', details: 'Please check this pronunciation.' });
+    expect(JSON.stringify(fixture.libraries.get('reporter@example.com'))).toBe(before);
+    expect(fixture.unexpected).toEqual([]);
+});
 
 test('existing sign-in form, SDK cookies, account isolation, cloud review and sign out', async ({ page }) => {
     const fixture = await installCloudFixture(page);

@@ -23,8 +23,8 @@ export async function authenticateShare(request: NextRequest): Promise<{ error: 
     }
 }
 export class ShareBodyTooLarge extends Error {}
-export async function readShareBody(request: NextRequest) {
-    if (Number(request.headers.get('content-length') || 0) > MAX_SHARE_BYTES) throw new ShareBodyTooLarge();
+export async function readShareBody(request: NextRequest, maxBytes = MAX_SHARE_BYTES) {
+    if (Number(request.headers.get('content-length') || 0) > maxBytes) throw new ShareBodyTooLarge();
     const reader = request.body?.getReader();
     if (!reader) throw new Error('Missing body');
     const chunks: Uint8Array[] = [];
@@ -33,7 +33,7 @@ export async function readShareBody(request: NextRequest) {
         const { done, value } = await reader.read();
         if (done) break;
         size += value.byteLength;
-        if (size > MAX_SHARE_BYTES) { await reader.cancel(); throw new ShareBodyTooLarge(); }
+        if (size > maxBytes) { await reader.cancel(); throw new ShareBodyTooLarge(); }
         chunks.push(value);
     }
     const bytes = new Uint8Array(size);

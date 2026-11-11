@@ -4,6 +4,12 @@ import seed from '../data/unit1.json';
 
 const deck = { setId: 'unit-1', name: ' Unit 1 ', entries: seed };
 describe('public vocabulary allowlist', () => {
+    it('requires explicit public opt-in and a chosen public name; old clients remain valid', () => {
+        expect(sharedDeckInputSchema.parse(deck)).not.toHaveProperty('isPublic');
+        for (const data of [{ isPublic: true }, { isPublic: true, creatorName: 'a' }, { isPublic: true, creatorName: 'private@example.com' }, { isPublic: 'true' }, { description: 'x'.repeat(501) }])
+            expect(sharedDeckInputSchema.safeParse({ ...deck, ...data }).success).toBe(false);
+        expect(sharedDeckInputSchema.parse({ ...deck, isPublic: true, creatorName: ' Learner ', description: ' Lesson 1 ' })).toMatchObject({ isPublic: true, creatorName: 'Learner', description: 'Lesson 1' });
+    });
     it('retains vocabulary, alignment, notes and examples, strips private state and unknown fields', () => {
         const parsed = sharedDeckInputSchema.parse({ ...deck, ownerId: 'secret', stars: {}, progress: {}, entries: [{ ...seed[0], privateData: 'secret' }] });
         expect(parsed.name).toBe('Unit 1');

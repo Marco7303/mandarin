@@ -17,13 +17,39 @@ model UserState {
 }
 
 model SharedDeck {
-  id        String   @id
-  ownerId   String   @map("owner_id")
-  setId     String   @map("set_id")
-  name      String
-  entries   Json     @db.JsonB
-  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id          String       @id
+  ownerId     String       @map("owner_id")
+  setId       String       @map("set_id")
+  name        String
+  entries     Json         @db.JsonB
+  isPublic    Boolean      @default(false) @map("is_public")
+  description String       @default("")
+  creatorName String       @default("") @map("creator_name")
+  wordCount   Int          @default(0) @map("word_count")
+  suppressed  Boolean      @default(false)
+  reports     DeckReport[]
+  updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@unique([ownerId, setId])
+  @@index([isPublic, suppressed, updatedAt, id])
   @@map("shared_deck")
+}
+
+model CreatorProfile {
+  userId      String @id @map("user_id")
+  displayName String @map("display_name")
+
+  @@map("creator_profile")
+}
+
+model DeckReport {
+  deckId     String     @map("deck_id")
+  reporterId String     @map("reporter_id")
+  reason     String
+  details    String
+  createdAt  DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  deck       SharedDeck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  @@id([deckId, reporterId])
+  @@map("deck_report")
 }
