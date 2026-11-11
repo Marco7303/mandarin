@@ -50,6 +50,14 @@ Regenerates `src/data/unit1.json` and `src/data/import-report.json` from the rea
 
 Full unchanged **EduKai 5.1**, supplied by the user, is served at `/fonts/edukai.ttf`. The embedded font metadata and official Taiwan Ministry of Education licence permit unchanged redistribution with attribution. Chinese content uses `lang="zh-Hant-TW"`; UI/Pinyin/English use Avenir Next with sans-serif fallbacks. Font size is approximately 15.8 MB because the licence prohibits modified derivatives; it is not subsetted. See [FONT-LICENSE.md](FONT-LICENSE.md). Attribution: **中華民國教育部**, CC BY-ND 3.0 TW. The original input file remains untouched.
 
+## Share study sets
+
+Open a set and choose **Share** (or **Share link** in its menu). Signed-in users can create an unlisted link, copy it, explicitly update its shared version, or stop sharing. Words, notes, tags, examples, and pronunciation alignment are included; account details, folders, stars, and study progress are excluded. Anyone with the link can open it without an account. There is no public directory or search indexing.
+
+Recipients preview the vocabulary and choose **Add to library** to save an independent copy in a folder. Each word gets a fresh ID and starts in Learning. Revisiting the same link offers **Open your copy**. Updates and revocation do not alter previously saved copies, which use the existing offline and account-sync behavior. Guests see the browser-storage notice and account signup action. A signed-in library must finish syncing before accepting a copy.
+
+Sharing adds one `shared_deck` table with one snapshot per owner/set, capped at 5,000 words and 2 MB per write. The existing Prisma Postgres and Hexclave configuration is sufficient; no additional service or environment variables are needed. Run `pnpm db:migrate` before using this feature or deploying the change. Public snapshots are fetched without caching; the service worker only caches the page shell, so revoked vocabulary is not available from an offline snapshot.
+
 ## Stack Auth, Prisma Postgres, and Vercel
 
 **No accounts or environment variables are needed to use Mori locally.** The Excel workbook is already bundled as the starter library. To enable sign-in and phone/laptop sync, set up two hosted services once:

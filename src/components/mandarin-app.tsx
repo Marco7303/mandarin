@@ -1,7 +1,9 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDownToLine, ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, ChevronRight, Folder as FolderIcon, Home, Leaf, MoreHorizontal, Plus, Search, Settings, Sparkles, Star, Upload, X, RotateCcw, WifiOff, Cloud, Archive, Pencil, Copy, Trash2 } from 'lucide-react';
+import { ArrowDownToLine, ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, ChevronRight, Folder as FolderIcon, Home, Leaf, MoreHorizontal, Plus, Search, Settings, Sparkles, Star, Upload, X, RotateCcw, WifiOff, Cloud, Archive, Pencil, Copy, Trash2, Share2 } from 'lucide-react';
 import seed from '@/data/unit1.json';
+import { ShareSet, SharedSetPreview } from './set-sharing';
+import type { SharedDeck } from '@/lib/sharing-schema';
 import { buildQueue, isLearned, makeEntry, normalizeStudyPreferences, recordAnswer, resetProgress, searchEntry, type Entry, type Direction, type Progress } from '@/lib/core';
 import { parseFile, parseText, exportCSV, validateEntries, type ImportResult } from '@/lib/importer';
 import { getClient, getSession, onAuthStateChange, getCloudRevision, loadCloud, saveCloud, signIn, signUp, signOut } from '@/lib/cloud';
@@ -11,6 +13,7 @@ type Folder = {
     archived?: boolean;
 };
 type Set = {
+    sourceShareId?: string;
     id: string;
     folderId: string;
     name: string;
@@ -30,12 +33,12 @@ type State = {
     stars: Record<string, boolean>;
     preferences: Preferences;
 };
-type Screen = 'home' | 'sets' | 'detail' | 'setup' | 'session' | 'result' | 'settings';
+type Screen = 'home' | 'sets' | 'detail' | 'setup' | 'session' | 'result' | 'settings' | 'shared';
 type Prompt = {
     entryId: string;
     direction: Direction;
 };
-type Modal = 'folder' | 'set' | 'entry' | 'import' | 'auth' | 'save-set' | null;
+type Modal = 'folder' | 'set' | 'entry' | 'import' | 'auth' | 'save-set' | 'share' | null;
 const directions: Direction[] = ['chinese', 'pinyin', 'english'];
 const labels = { chinese: 'Chinese', pinyin: 'Pinyin', english: 'English', mixed: 'Mixed' };
 const defaultPreferences: Preferences = { prompt: 'chinese', filter: 'Learning', order: 'Original', amount: '20' };
@@ -44,7 +47,9 @@ const key = (id: string, d: Direction) => `${id}:${d}`;
 const uid = () => crypto.randomUUID();
 const cn = (...parts: (string | false | undefined)[]) => parts.filter(Boolean).join(' ');
 const today = () => new Date().toISOString().slice(0, 10);
-export default function MandarinApp() {
+export default function MandarinApp({ shareId }: { shareId?: string }) {
+    const [incomingShareId, setIncomingShareId] = useState(shareId || '');
+    const [sharingSetId, setSharingSetId] = useState('');
     const [data, setData] = useState<State>(initialState);
     const [ready, setReady] = useState(false);
     const [screen, setScreen] = useState<Screen>('home');
@@ -129,7 +134,9 @@ export default function MandarinApp() {
         setSelectedSets(state.sets[0] ? [state.sets[0].id] : []);
         setQueue([]);
         setAnswers([]);
-        setScreen('home');
+        const linkId = window.location.pathname.match(/^\/share\/([^/]+)\/?$/)?.[1];
+        if (linkId) setIncomingShareId(linkId);
+        setScreen(linkId ? 'shared' : 'home');
         setModal(null);
         setReady(true);
         return state;
@@ -352,7 +359,7 @@ export default function MandarinApp() {
     const starred = Object.values(data.stars).filter(Boolean).length;
     const notify = (message: string) => setToast(message);
     const update = (fn: (previous: State) => State) => setData(fn);
-    function navigate(next: Screen) { setScreen(next); setMenu(null); setQuery(''); window.scrollTo(0, 0); }
+    function navigate(next: Screen) { if (window.location.pathname.startsWith('/share/')) window.history.replaceState(null, '', '/'); setScreen(next); setMenu(null); setQuery(''); window.scrollTo(0, 0); }
     function openSet(id: string) { setSelectedSets([id]); navigate('detail'); }
     function setup(ids = selectedSets, filter = 'Learning') { setSelectedSets(ids);
         update(d => ({ ...d, preferences: { ...d.preferences, filter, ...(filter === 'Starred' ? { prompt: 'mixed' as const } : {}) } })); navigate('setup'); }
@@ -406,7 +413,27 @@ export default function MandarinApp() {
         answer(true); }; window.addEventListener('keydown', handler); return () => window.removeEventListener('keydown', handler); }, [screen, modal, answer, toggleAnswer]);
     function toggleStar(id: string, d: Direction) { update(s => ({ ...s, stars: { ...s.stars, [key(id, d)]: !s.stars[key(id, d)] } })); }
     function exportEntries(list: Entry[], name: string) { const blob = new Blob([exportCSV(list)], { type: 'text/csv;charset=utf-8' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${name}.csv`; a.click(); URL.revokeObjectURL(url); setMenu(null); }
-    function duplicateSet(s: Set) { const id = uid(); update(d => ({ ...d, sets: [...d.sets, { ...s, id, name: `${s.name} copy` }], entries: [...d.entries, ...entries.filter(e => e.setId === s.id).map(e => ({ ...e, id: uid(), setId: id }))] })); setMenu(null); notify('Set duplicated'); }
+    function duplicateSet(s: Set) { const id = uid(); update(d => ({ ...d, sets: [...d.sets, { ...s, sourceShareId: undefined, id, name: `${s.name} copy` }], entries: [...d.entries, ...entries.filter(e => e.setId === s.id).map(e => ({ ...e, id: uid(), setId: id }))] })); setMenu(null); notify('Set duplicated'); }
+    function openShare(setId: string) { setSharingSetId(setId); setMenu(null); setModal('share'); }
+    function saveSharedSet(deck: SharedDeck, folderId: string) {
+        const current = dataRef.current;
+        if (email && (!syncReady.current || syncConflict)) { notify('Sync your library before adding this set.'); return; }
+        const existing = current.sets.find(s => s.sourceShareId === deck.id);
+        if (existing) { openSet(existing.id); return; }
+        if (current.entries.length + deck.entries.length > 20000 || current.sets.length >= 2000) {
+            notify('Your library is full. Remove unused sets before adding this one.'); return;
+        }
+        const folder = current.folders.find(f => f.id === folderId && !f.archived);
+        if (!folder && current.folders.length >= 500) { notify('Your library has too many folders. Restore a folder first.'); return; }
+        const targetFolder = folder?.id || uid(), setId = uid();
+        const copied = deck.entries.map(entry => makeEntry({ ...entry, id: uid(), setId }, setId));
+        update(d => ({ ...d,
+            folders: folder ? d.folders : [...d.folders, { id: targetFolder, name: 'Shared sets' }],
+            sets: [...d.sets, { id: setId, name: deck.name, folderId: targetFolder, sourceShareId: deck.id }],
+            entries: [...d.entries, ...copied],
+        }));
+        setActiveFolder(targetFolder); openSet(setId); notify('Set added to your library');
+    }
     function editEntry(entry?: Entry) { setEditing(entry?.id || null); setModal('entry'); }
     async function readImport(file: File) { setImportSource(file); setImportBusy(true); try {
         setImportResult(await parseFile(file));
@@ -424,6 +451,8 @@ export default function MandarinApp() {
         pendingCreateSet.current = resumeSet;
         setPreferSignUp(signup); setAuthError(''); setModal('auth');
     }
+    const sharingSet = data.sets.find(s => s.id === sharingSetId);
+    const sharedCopy = data.sets.find(s => s.sourceShareId === incomingShareId);
     const visibleSets = sets.filter(s => (activeFolder === 'all' || s.folderId === activeFolder) && (!query || s.name.toLowerCase().includes(query.toLowerCase()) || entries.some(e => e.setId === s.id && searchEntry(e, query))));
     const isStudy = screen === 'session' || screen === 'result';
     return <div className="app-shell" onFocusCapture={e => { if (!modal)
@@ -442,6 +471,7 @@ export default function MandarinApp() {
       <main id="main-content" className={cn('main', isStudy && 'session-main')}>
       {ready && !email && !isStudy && <section className="guest-notice" aria-label="Browser-only storage"><div><strong>Saved only in this browser</strong><p>Clearing browser data will delete your sets and progress.</p></div>{getClient() && <button className="button primary small" onClick={() => openAuth(true)}>Create account</button>}</section>}
       {!ready ? <div className="loading"><Leaf className="loading-leaf"/>Loading…</div> : <>
+      {screen === 'shared' && incomingShareId && <SharedSetPreview key={`${incomingShareId}:${libraryMeta.current.owner}`} id={incomingShareId} folders={folders} existing={sharedCopy} signedIn={!!email} canSave={!email || (syncReady.current && !syncConflict)} onSave={saveSharedSet} onOpen={id => { if (sharedCopy?.archived || data.folders.find(f => f.id === sharedCopy?.folderId)?.archived) { update(d => ({ ...d, sets: d.sets.map(s => s.id === id ? { ...s, archived: false } : s), folders: d.folders.map(f => f.id === sharedCopy?.folderId ? { ...f, archived: false } : f) })); } openSet(id); }} onHome={() => navigate('home')}/>}
       {screen === 'home' && <>
         <div className="page-heading"><div><h1>Your study space</h1></div><span className="date-label">{new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', weekday: 'short' })}</span></div>
         <section className="daily-card"><div className="daily-copy"><h2>Study cards</h2><p>{learning > 0 ? `${learning} words in Learning · ${labels[data.preferences.prompt]}` : 'All cards learned for the selected front.'}</p><button className="button primary" onClick={() => setup(activeSets.map(s => s.id), 'Learning')}>Study cards <ArrowRight size={18}/></button></div><div className="daily-character" aria-hidden="true"><span lang="zh-Hant-TW">學</span><div><i />xué <i /></div><small>to learn</small></div></section>
@@ -458,7 +488,7 @@ export default function MandarinApp() {
       </>}
       {screen === 'detail' && activeSet && <>
         <button className="back-link" onClick={() => navigate('sets')}><ArrowLeft size={16}/>{activeFolder === 'all' ? 'All sets' : data.folders.find(f => f.id === activeFolder)?.name || 'All sets'}</button><div className="page-heading"><div><div className="eyebrow">{data.folders.find(f => f.id === activeSet.folderId)?.name}</div><h1>{activeSet.name}<span className="accent">.</span></h1><p>{selectedEntries.length} words</p></div><button className="button primary" onClick={() => setup()}>Study set <ArrowRight size={18}/></button></div>
-        <div className="collection-toolbar"><div className="search"><Search size={18}/><input aria-label="Search words" placeholder="Search Chinese, pinyin, English…" value={query} onChange={e => setQuery(e.target.value)}/></div><div className="heading-actions"><button className="button subtle" onClick={() => resetSet(activeSet.id)}><RotateCcw size={17}/>Reset progress</button><button className="button subtle" onClick={() => { setDestination(activeSet.id); setImportResult(null); setModal('import'); }}><Upload size={17}/>Import</button><button className="button secondary" onClick={() => editEntry()}><Plus size={17}/>Add word</button></div></div>
+        <div className="collection-toolbar"><div className="search"><Search size={18}/><input aria-label="Search words" placeholder="Search Chinese, pinyin, English…" value={query} onChange={e => setQuery(e.target.value)}/></div><div className="heading-actions"><button className="button subtle" onClick={() => openShare(activeSet.id)}><Share2 size={17}/>Share</button><button className="button subtle" onClick={() => resetSet(activeSet.id)}><RotateCcw size={17}/>Reset progress</button><button className="button subtle" onClick={() => { setDestination(activeSet.id); setImportResult(null); setModal('import'); }}><Upload size={17}/>Import</button><button className="button secondary" onClick={() => editEntry()}><Plus size={17}/>Add word</button></div></div>
         <div className="word-list"><div className="word-list-head"><span>TRADITIONAL CHINESE</span><span>PINYIN</span><span>ENGLISH</span><span /></div>{selectedEntries.filter(e => searchEntry(e, query)).map(entry => <div className="word-row" key={entry.id}><button className="word-chinese" lang="zh-Hant-TW" onClick={() => editEntry(entry)}>{entry.traditional}</button><span className="word-pinyin">{entry.pinyin}</span><span className="word-english">{entry.english}</span><div className="word-actions"><button className={cn('icon-button', data.stars[key(entry.id, 'english')] && 'is-starred')} aria-label={`Star English prompt for ${entry.traditional}`} onClick={() => toggleStar(entry.id, 'english')}><Star size={18} fill={data.stars[key(entry.id, 'english')] ? 'currentColor' : 'none'}/></button><button className="icon-button" aria-label={`Edit ${entry.traditional}`} onClick={() => editEntry(entry)}><Pencil size={16}/></button></div></div>)}</div>{!selectedEntries.length && <div className="empty"><Leaf size={32}/><h3>No words in this set</h3><button className="button primary" onClick={() => editEntry()}>Add word</button></div>}
       </>}
       {screen === 'setup' && <>
@@ -496,7 +526,8 @@ export default function MandarinApp() {
                 e.preventDefault();
                 first?.focus();
             }
-        } }}><div className="modal-heading"><div><h2 id="modal-title">{modal === 'save-set' ? 'Save sets to your account' : modal === 'folder' ? (editing ? 'Rename folder' : 'Create a folder') : modal === 'set' ? (editing ? 'Edit study set' : 'Create a study set') : modal === 'entry' ? (editing ? 'Edit word' : 'Add a word') : modal === 'import' ? 'Import vocabulary' : 'Account'}</h2></div><button autoFocus className="icon-button" aria-label="Close dialog" onClick={closeModal}><X size={22}/></button></div>
+        } }}><div className="modal-heading"><div><h2 id="modal-title">{modal === 'share' ? 'Share set' : modal === 'save-set' ? 'Save sets to your account' : modal === 'folder' ? (editing ? 'Rename folder' : 'Create a folder') : modal === 'set' ? (editing ? 'Edit study set' : 'Create a study set') : modal === 'entry' ? (editing ? 'Edit word' : 'Add a word') : modal === 'import' ? 'Import vocabulary' : 'Account'}</h2></div><button autoFocus className="icon-button" aria-label="Close dialog" onClick={closeModal}><X size={22}/></button></div>
+      {modal === 'share' && sharingSet && <ShareSet key={`${libraryMeta.current.owner}:${sharingSet.id}`} set={sharingSet} entries={entries.filter(e => e.setId === sharingSet.id)} owner={libraryMeta.current.owner} signedIn={!!email} onAuth={signup => openAuth(signup)}/>}
       {modal === 'save-set' && <><p className="modal-intro">Without an account, this set is saved only in this browser. Clearing browser data will delete it.</p>{getClient() ? <><p className="modal-intro">Create an account to save new sets online and access them on other devices.</p><div className="account-prompt-actions"><button className="button primary full" onClick={() => openAuth(true, true)}>Create account</button><button className="button secondary full" onClick={() => openAuth(false, true)}>Sign in</button></div></> : <p className="modal-intro">Account sign-in is currently unavailable.</p>}<button className="button subtle full" onClick={() => setModal('set')}>Continue in this browser</button></>}
       {modal === 'set' && !email && <p className="modal-intro">This set will be saved only in this browser.</p>}
       {(modal === 'folder' || modal === 'set') && <form onSubmit={e => { e.preventDefault(); const form = new FormData(e.currentTarget); const name = String(form.get('name')).trim(); if (!name)
@@ -553,7 +584,7 @@ export default function MandarinApp() {
         set: Set;
         index: number;
         selectable?: boolean;
-    }) { const words = entries.filter(e => e.setId === s.id); const known = words.filter(e => directions.some(d => isLearned(data.progress[key(e.id, d)]))).length; return <article className="set-card"><div className="set-card-top"><span className={cn('set-symbol', i % 3 === 1 && 'sage', i % 3 === 2 && 'sand')} lang="zh-Hant-TW">{words[0]?.traditional.slice(0, 1) || '字'}</span><div className="set-menu-wrap"><button className="icon-button" aria-label={`Manage ${s.name}`} onClick={() => setMenu(menu === s.id ? null : s.id)}><MoreHorizontal size={20}/></button>{menu === s.id && <div className="dropdown"><button onClick={() => { setEditing(s.id); setModal('set'); setMenu(null); }}><Pencil size={15}/>Edit / move</button><button onClick={() => resetSet(s.id)}><RotateCcw size={15}/>Reset progress</button><button onClick={() => duplicateSet(s)}><Copy size={15}/>Duplicate</button><button onClick={() => exportEntries(words, s.name)}><ArrowDownToLine size={15}/>Export CSV</button><button onClick={() => { update(d => ({ ...d, sets: d.sets.map(x => x.id === s.id ? { ...x, archived: !x.archived } : x) })); setMenu(null); }}><Archive size={15}/>{s.archived ? 'Restore' : 'Archive'}</button></div>}</div></div><button className="set-open" onClick={() => openSet(s.id)}><span className="set-folder">{data.folders.find(f => f.id === s.folderId)?.name || 'My collection'}</span><h3>{s.name}</h3><span className="set-words">{words.length} words</span></button><div className="set-progress"><span style={{ width: `${words.length ? known / words.length * 100 : 0}%` }}/></div><div className="set-card-bottom"><span>{`${known} learned`}</span>{selectable ? <label className="select-set"><input type="checkbox" aria-label={`Select ${s.name}`} checked={selectedSets.includes(s.id)} onChange={e => setSelectedSets(ids => e.target.checked ? [...ids, s.id] : ids.filter(x => x !== s.id))}/>Select</label> : <button className="icon-button" aria-label={`Study ${s.name}`} onClick={() => setup([s.id])}><ArrowRight size={18}/></button>}</div></article>; }
+    }) { const words = entries.filter(e => e.setId === s.id); const known = words.filter(e => directions.some(d => isLearned(data.progress[key(e.id, d)]))).length; return <article className="set-card"><div className="set-card-top"><span className={cn('set-symbol', i % 3 === 1 && 'sage', i % 3 === 2 && 'sand')} lang="zh-Hant-TW">{words[0]?.traditional.slice(0, 1) || '字'}</span><div className="set-menu-wrap"><button className="icon-button" aria-label={`Manage ${s.name}`} onClick={() => setMenu(menu === s.id ? null : s.id)}><MoreHorizontal size={20}/></button>{menu === s.id && <div className="dropdown"><button onClick={() => openShare(s.id)}><Share2 size={15}/>Share link</button><button onClick={() => { setEditing(s.id); setModal('set'); setMenu(null); }}><Pencil size={15}/>Edit / move</button><button onClick={() => resetSet(s.id)}><RotateCcw size={15}/>Reset progress</button><button onClick={() => duplicateSet(s)}><Copy size={15}/>Duplicate</button><button onClick={() => exportEntries(words, s.name)}><ArrowDownToLine size={15}/>Export CSV</button><button onClick={() => { update(d => ({ ...d, sets: d.sets.map(x => x.id === s.id ? { ...x, archived: !x.archived } : x) })); setMenu(null); }}><Archive size={15}/>{s.archived ? 'Restore' : 'Archive'}</button></div>}</div></div><button className="set-open" onClick={() => openSet(s.id)}><span className="set-folder">{data.folders.find(f => f.id === s.folderId)?.name || 'My collection'}</span><h3>{s.name}</h3><span className="set-words">{words.length} words</span></button><div className="set-progress"><span style={{ width: `${words.length ? known / words.length * 100 : 0}%` }}/></div><div className="set-card-bottom"><span>{`${known} learned`}</span>{selectable ? <label className="select-set"><input type="checkbox" aria-label={`Select ${s.name}`} checked={selectedSets.includes(s.id)} onChange={e => setSelectedSets(ids => e.target.checked ? [...ids, s.id] : ids.filter(x => x !== s.id))}/>Select</label> : <button className="icon-button" aria-label={`Study ${s.name}`} onClick={() => setup([s.id])}><ArrowRight size={18}/></button>}</div></article>; }
 }
 function EntryForm({ entry, setId, learned, onLearning, stars, onStar, onSave, onArchive, onDuplicate, onDelete }: {
     entry?: Entry;

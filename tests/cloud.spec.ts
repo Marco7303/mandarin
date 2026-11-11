@@ -1,5 +1,9 @@
 import { test, expect, type Page } from '@playwright/test';
 
+// Keep HTTP fixtures in Playwright's routing layer. The separate app suite
+// exercises the real service worker and offline storage.
+test.use({ serviceWorkers: 'block' });
+
 // These tests use the real Stack browser SDK against controlled HTTP fixtures.
 // No real credentials, accounts, emails, or hosted data are used.
 async function installCloudFixture(page: Page) {
@@ -67,7 +71,7 @@ async function settings(page: Page) { await page.getByRole('button', { name: 'Se
 
 test('existing sign-in form, SDK cookies, account isolation, cloud review and sign out', async ({ page }) => {
     const fixture = await installCloudFixture(page);
-    await page.goto('/');
+    await page.goto('/', {waitUntil:'domcontentloaded'});
     await signIn(page, 'a@example.com');
     await expect.poll(() => fixture.libraries.get('a@example.com')?.revision).toBe(1);
     expect((fixture.libraries.get('a@example.com')!.state.entries as unknown[]).length).toBe(55);
@@ -75,7 +79,7 @@ test('existing sign-in form, SDK cookies, account isolation, cloud review and si
     await page.getByRole('button', { name: 'Start studying' }).click();
     await page.keyboard.press('Space'); await page.keyboard.press('ArrowRight');
     await expect.poll(() => Object.keys(fixture.libraries.get('a@example.com')?.state.progress as object || {}).length).toBe(1);
-    await page.reload();
+    await page.reload({waitUntil:'domcontentloaded'});
     await settings(page);
     await expect(page.getByText('a@example.com', { exact: true })).toBeVisible();
     await page.getByRole('button', { name: 'Sign out', exact: true }).click();
@@ -89,14 +93,14 @@ test('existing sign-in form, SDK cookies, account isolation, cloud review and si
 });
 
 test('wrong credentials stay in the unchanged form with a readable error', async ({ page }) => {
-    await installCloudFixture(page); await page.goto('/');
+    await installCloudFixture(page); await page.goto('/', {waitUntil:'domcontentloaded'});
     await signIn(page, 'a@example.com', 'wrongpass');
     await expect(page.locator('.form-error')).toContainText(/password/i);
     await expect(page.getByRole('button', { name: 'Sign in', exact: true }).last()).toBeEnabled();
 });
 
 test('signup uses the existing form and seeds an active account from Excel', async ({ page }) => {
-    const fixture = await installCloudFixture(page); await page.goto('/'); await openSignIn(page);
+    const fixture = await installCloudFixture(page); await page.goto('/', {waitUntil:'domcontentloaded'}); await openSignIn(page);
     await page.getByLabel('Email', { exact: true }).fill('new@example.com');
     await page.getByLabel('Password', { exact: true }).fill('password123');
     await page.getByRole('dialog').getByRole('button', { name: 'Create account', exact: true }).click();
@@ -105,13 +109,13 @@ test('signup uses the existing form and seeds an active account from Excel', asy
 });
 
 test('pending reviews survive a database outage and retry without duplication', async ({ page }) => {
-    const fixture = await installCloudFixture(page); await page.goto('/'); await signIn(page, 'a@example.com');
+    const fixture = await installCloudFixture(page); await page.goto('/', {waitUntil:'domcontentloaded'}); await signIn(page, 'a@example.com');
     await expect.poll(() => fixture.libraries.get('a@example.com')?.revision).toBe(1);
     fixture.setFailWrites(true);
     await page.getByRole('button', { name: 'Study cards' }).click(); await page.getByRole('button', { name: 'Start studying' }).click();
     await page.keyboard.press('Space'); await page.keyboard.press('ArrowRight');
     await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('mori-v2:a@example.com')!).pending)).toBe(true);
-    await page.reload(); await settings(page);
+    await page.reload({waitUntil:'domcontentloaded'}); await settings(page);
     await expect(page.locator('#main-content').getByText('Saved locally · sync pending', { exact: true })).toBeVisible();
     fixture.setFailWrites(false);
     await page.getByRole('button', { name: 'Sync now', exact: true }).click();
@@ -122,7 +126,7 @@ test('pending reviews survive a database outage and retry without duplication', 
 
 test('email-restricted signup stays local until verification', async ({ page }) => {
     const fixture = await installCloudFixture(page); fixture.setRestricted(true);
-    await page.goto('/');
+    await page.goto('/', {waitUntil:'domcontentloaded'});
     await page.getByRole('button', {name:'Create a study set',exact:true}).click();
     await page.getByRole('dialog').getByRole('button', {name:'Create account',exact:true}).click();
     await page.getByLabel('Email', { exact: true }).fill('verify@example.com');
@@ -135,7 +139,7 @@ test('email-restricted signup stays local until verification', async ({ page }) 
 });
 
 for (const keepDevice of [true, false]) test(`cloud conflict can ${keepDevice ? 'keep this device' : 'use the cloud copy'}`, async ({ page }) => {
-    const fixture = await installCloudFixture(page); await page.goto('/'); await signIn(page, 'a@example.com');
+    const fixture = await installCloudFixture(page); await page.goto('/', {waitUntil:'domcontentloaded'}); await signIn(page, 'a@example.com');
     await expect.poll(() => fixture.libraries.get('a@example.com')?.revision).toBe(1);
     const cloud = fixture.libraries.get('a@example.com')!;
     cloud.revision = 2;
@@ -155,7 +159,7 @@ for (const keepDevice of [true, false]) test(`cloud conflict can ${keepDevice ? 
 
 test('legacy cloud progress becomes Learning and Learned, and reset syncs without deleting vocabulary or stars', async ({page}) => {
     const fixture = await installCloudFixture(page);
-    await page.goto('/'); await signIn(page, 'a@example.com');
+    await page.goto('/', {waitUntil:'domcontentloaded'}); await signIn(page, 'a@example.com');
     await expect.poll(() => fixture.libraries.get('a@example.com')?.revision).toBe(1);
     const cloud = fixture.libraries.get('a@example.com')!;
     const entries = (cloud.state.entries as {id:string}[]).slice(0,2);
@@ -165,7 +169,7 @@ test('legacy cloud progress becomes Learning and Learned, and reset syncs withou
     cloud.state.stars = { [entries[0].id+':chinese']: true };
     cloud.state.preferences = { prompt:'chinese', filter:'Due', order:'Review order', amount:'All' };
     cloud.revision++;
-    await page.reload();
+    await page.reload({waitUntil:'domcontentloaded'});
     await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('mori-v2:a@example.com')!).baseRevision)).toBe(2);
     await page.getByRole('button',{name:'Study Unit 1',exact:true}).click();
     await expect(page.getByRole('button',{name:'Learning',exact:true})).toHaveClass(/selected/);
@@ -185,7 +189,7 @@ test('legacy cloud progress becomes Learning and Learned, and reset syncs withou
 });
 
 test('guest account prompt resumes set creation after signup and saves the set online', async ({page}) => {
- const fixture=await installCloudFixture(page);await page.goto('/');
+ const fixture=await installCloudFixture(page);await page.goto('/', {waitUntil:'domcontentloaded'});
  await page.getByRole('button',{name:'Create a study set',exact:true}).click();
  const dialog=page.getByRole('dialog');
  await expect(dialog.getByRole('heading',{name:'Save sets to your account'})).toBeVisible();
@@ -208,7 +212,7 @@ test('guest account prompt resumes set creation after signup and saves the set o
 });
 
 test('cancelling the account prompt cancels pending set creation', async ({page}) => {
- const fixture=await installCloudFixture(page);await page.goto('/');
+ const fixture=await installCloudFixture(page);await page.goto('/', {waitUntil:'domcontentloaded'});
  await page.getByRole('button',{name:'Create a study set',exact:true}).click();
  await page.getByRole('dialog').getByRole('button',{name:'Sign in',exact:true}).click();
  await page.getByRole('button',{name:'Close dialog'}).click();
@@ -216,4 +220,81 @@ test('cancelling the account prompt cancels pending set creation', async ({page}
  await expect.poll(()=>fixture.libraries.get('a@example.com')?.revision).toBe(1);
  await expect(page.getByRole('dialog')).toHaveCount(0);
  await expect(page.getByRole('heading',{name:'Your study space'})).toBeVisible();
+});
+
+test('owners create, update and revoke a shared snapshot without publishing progress or other sets',async({page})=>{
+ const fixture=await installCloudFixture(page);
+ type Share={id:string;name:string;entries:Record<string,unknown>[];updatedAt:string};
+ let share:Share|null=null;
+ const writes:Record<string,unknown>[]=[];
+ const requests:{method:string;owner:string|undefined;authorization:string|undefined}[]=[];
+ await page.route('**/api/shares**',async route=>{
+  const request=route.request();const url=new URL(request.url());
+  requests.push({method:request.method(),owner:request.headers()['x-mori-owner'],authorization:request.headers().authorization});
+  if(request.method()==='GET')return route.fulfill({json:{share}});
+  if(request.method()==='DELETE'){share=null;return route.fulfill({json:{success:true}});}
+  const body=request.postDataJSON();writes.push(body);
+  share={id:'a3278291-32e0-4dbb-bbcb-013968d04c98',name:body.name,entries:body.entries,updatedAt:new Date().toISOString()};
+  expect(url.pathname).toBe('/api/shares');
+  return route.fulfill({json:share});
+ });
+ await page.goto('/', {waitUntil:'domcontentloaded'});await signIn(page,'a@example.com');
+ await expect.poll(()=>fixture.libraries.get('a@example.com')?.revision).toBe(1);
+ await page.locator('.set-open').first().click();
+ await page.getByRole('button',{name:'Share',exact:true}).click();
+ const dialog=page.getByRole('dialog');
+ await expect(dialog.getByRole('heading',{name:'Share set',exact:true})).toBeVisible();
+ await dialog.getByRole('button',{name:'Create link',exact:true}).click();
+ await expect(dialog.getByLabel('Share link',{exact:true})).toHaveValue(/\/share\/a3278291-32e0-4dbb-bbcb-013968d04c98$/);
+ await expect(dialog.getByRole('button',{name:'Copy link',exact:true})).toBeVisible();
+ expect(writes).toHaveLength(1);expect(writes[0].setId).toBe('unit-1');
+ expect(writes[0].entries).toHaveLength(55);expect(writes[0]).not.toHaveProperty('progress');expect(writes[0]).not.toHaveProperty('stars');expect(writes[0]).not.toHaveProperty('folders');
+ await dialog.getByRole('button',{name:'Close dialog',exact:true}).click();
+ // A later local edit is published only by explicitly updating the same link.
+ await page.getByRole('button',{name:/^Edit /}).first().click();
+ await page.getByLabel('English',{exact:true}).fill('Updated shared definition');
+ await page.getByRole('button',{name:'Save word',exact:true}).click();
+ await page.getByRole('button',{name:'Share',exact:true}).click();
+ await expect(dialog.getByLabel('Share link',{exact:true})).toBeVisible();
+ expect(writes).toHaveLength(1);
+ await dialog.getByRole('button',{name:'Update shared version',exact:true}).click();
+ await expect.poll(()=>writes.length).toBe(2);
+ expect((writes[1].entries as {english:string}[])[0].english).toBe('Updated shared definition');
+ await expect(dialog.getByLabel('Share link',{exact:true})).toHaveValue(/\/share\/a3278291-32e0-4dbb-bbcb-013968d04c98$/);
+ page.once('dialog',confirmation=>confirmation.accept());
+ await dialog.getByRole('button',{name:'Stop sharing',exact:true}).click();
+ await expect(dialog.getByRole('button',{name:'Create link',exact:true})).toBeVisible();
+ await expect(dialog.getByLabel('Share link',{exact:true})).toHaveCount(0);
+ expect(share).toBeNull();
+ expect(requests.every(r=>r.owner==='a@example.com'&&r.authorization?.startsWith('Bearer stackauth_'))).toBe(true);
+ expect(requests.some(r=>r.method==='DELETE')).toBe(true);
+ expect(fixture.unexpected).toEqual([]);
+});
+
+test('a signed-in recipient saves a shared copy online and keeps it after revocation',async({page})=>{
+ const fixture=await installCloudFixture(page);
+ const id='94ec3a6e-d77c-44f2-9697-6274e8bd6475';
+ let revoked=false;
+ await page.route(`**/api/shares/${id}`,route=>revoked?route.fulfill({status:404,json:{error:'Unavailable'}}):route.fulfill({json:{id,name:'Received vocabulary',updatedAt:new Date().toISOString(),entries:[{id:'public-word',setId:'someone-elses-set',traditional:'學校',english:'school',pinyin:'xuéxiào',numbered:'xue2 xiao4',alignment:[{character:'學',pinyin:'xué'},{character:'校',pinyin:'xiào'}],alignmentReview:false,notes:'Shared example',tags:[]}]}}));
+ await page.goto('/', {waitUntil:'domcontentloaded'});await signIn(page,'recipient@example.com');
+ await expect.poll(()=>fixture.libraries.get('recipient@example.com')?.revision).toBe(1);
+ await page.goto(`/share/${id}`, {waitUntil:'domcontentloaded'});
+ await expect(page.getByRole('button',{name:'Add to library',exact:true})).toBeEnabled();
+ await page.getByRole('button',{name:'Add to library',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Received vocabulary.',exact:true})).toBeVisible();
+ await expect.poll(()=>(fixture.libraries.get('recipient@example.com')?.state.sets as {sourceShareId?:string}[]|undefined)?.some(s=>s.sourceShareId===id)).toBe(true);
+ await page.getByRole('button',{name:'Study set',exact:true}).click();
+ await page.getByRole('button',{name:'Start studying',exact:true}).click();
+ await page.getByRole('button',{name:'Reveal answer',exact:true}).click();
+ await page.getByRole('button',{name:'Know',exact:true}).click();
+ await expect.poll(()=>Object.keys(fixture.libraries.get('recipient@example.com')?.state.progress as object||{}).length).toBe(1);
+ const saved=fixture.libraries.get('recipient@example.com')!.state;
+ const word=(saved.entries as {id:string;english:string}[]).find(e=>e.english==='school')!;
+ expect(word.id).not.toBe('public-word');expect(saved.progress).not.toHaveProperty('public-word:chinese');
+ revoked=true;await page.goto(`/share/${id}`, {waitUntil:'domcontentloaded'});
+ await expect(page.getByRole('heading',{name:'Set unavailable',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Open your copy',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Received vocabulary.',exact:true})).toBeVisible();
+ expect(Object.keys(fixture.libraries.get('recipient@example.com')!.state.progress as object)).toHaveLength(1);
+ expect(fixture.unexpected).toEqual([]);
 });

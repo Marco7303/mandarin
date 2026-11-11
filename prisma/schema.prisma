@@ -15,3 +15,15 @@ model UserState {
 
   @@map("user_state")
 }
+
+model SharedDeck {
+  id        String   @id
+  ownerId   String   @map("owner_id")
+  setId     String   @map("set_id")
+  name      String
+  entries   Json     @db.JsonB
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([ownerId, setId])
+  @@map("shared_deck")
+}

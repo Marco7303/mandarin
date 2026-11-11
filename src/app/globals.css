@@ -1303,7 +1303,7 @@ fieldset legend {
   font-size:12px;
   color:#7c8b70;
 }
-.modal input:not([type=checkbox]),.modal textarea,.modal select,.setup-panel select {
+.modal input:not([type=checkbox]),.modal textarea,.modal select,.setup-panel select,.shared-save-actions select {
   width:100%;
   border:1px solid #dfe5d7;
   border-radius:6px;
@@ -2736,4 +2736,36 @@ select {
 .account-prompt-actions { display:grid; gap:10px; margin-bottom:8px; }
 @media(max-width:640px) {
   .guest-notice { flex-direction:column; align-items:stretch; gap:12px; padding:14px; }
+}
+
+/* Sharing stays in the set's actions; saved copies use the existing library. */
+.share-content { display:grid; gap:18px; }
+.share-content .modal-intro { margin:0; }
+.share-note { color:var(--muted); font-size:13px; line-height:1.6; }
+.share-link-label { display:grid; gap:8px; font-weight:500; }
+.share-link-label input { width:100%; min-width:0; font-size:14px; }
+.share-actions { display:flex; gap:18px; align-items:center; flex-wrap:wrap; }
+.shared-heading h1 { overflow-wrap:anywhere; }
+.shared-save { display:flex; align-items:center; justify-content:space-between; gap:28px; padding:26px; border:1px solid var(--line); border-radius:16px; background:var(--white); margin:0 0 28px; }
+.shared-save h2 { font-size:20px; margin-bottom:8px; }
+.shared-save p { max-width:560px; color:var(--muted); font-size:14px; line-height:1.6; }
+.shared-save p + p { margin-top:8px; }
+.shared-save-actions { display:grid; gap:12px; flex:0 0 230px; }
+.shared-save-actions label { display:grid; gap:6px; font-size:13px; color:var(--muted); }
+.shared-save-actions select { width:100%; margin:0; }
+.shared-word-list { border:1px solid var(--line); border-radius:14px; background:var(--white); overflow:hidden; }
+.shared-word { display:grid; grid-template-columns:26px minmax(0,1fr) minmax(0,1fr); align-items:center; gap:16px; padding:18px 24px; }
+.shared-word + .shared-word { border-top:1px solid var(--line); }
+.shared-word-number { color:var(--muted); font-size:12px; }
+.shared-word > div { display:grid; gap:3px; min-width:0; }
+.shared-chinese { font-size:27px; overflow-wrap:anywhere; }
+.shared-pinyin { font-size:14px; color:var(--muted); overflow-wrap:anywhere; }
+.shared-english { font-size:15px; overflow-wrap:anywhere; }
+.shared-more { margin:20px auto; display:flex; }
+.shared-unavailable { display:grid; gap:22px; padding:30px 0; }
+.shared-unavailable p { color:var(--muted); line-height:1.7; }
+@media(max-width:600px) {
+  .shared-save { flex-direction:column; align-items:stretch; padding:20px; gap:20px; }
+  .shared-save-actions { flex-basis:auto; }
+  .shared-word { grid-template-columns:18px minmax(0,1fr) minmax(0,1fr); padding:16px; gap:10px; }
 }

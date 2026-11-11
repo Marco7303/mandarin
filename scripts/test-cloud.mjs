@@ -18,7 +18,7 @@ const fixtureEnvironment = {
 };
 let result = 1;
 try {
-    result = await run(['test:e2e'], fixtureEnvironment);
+    result = await run(['test:e2e', ...process.argv.slice(2)], fixtureEnvironment);
 } finally {
     // Public auth keys are compiled into Next.js. Always restore a build using
     // the user's original environment, including when a browser test fails.

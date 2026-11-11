@@ -255,3 +255,71 @@ test('cards toggle closed without saving an answer, and character pinyin stays s
  await expect(page.getByRole('button',{name:'Hide answer',exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
 });
+
+const sharedId = 'a3278291-32e0-4dbb-bbcb-013968d04c98';
+const sharedWords = [
+ {id:'shared-one',setId:'source-set',traditional:'學生',english:'student',pinyin:'xuéshēng',numbered:'xue2 sheng1',alignment:[{character:'學',pinyin:'xué'},{character:'生',pinyin:'shēng'}],alignmentReview:false,notes:'Class vocabulary',tags:['school']},
+ {id:'shared-two',setId:'source-set',traditional:'老師',english:'teacher',pinyin:'lǎoshī',numbered:'lao3 shi1',alignment:[{character:'老',pinyin:'lǎo'},{character:'師',pinyin:'shī'}],alignmentReview:false,notes:'',tags:[]},
+];
+const sharedSet = {id:sharedId,name:'Shared class words',entries:sharedWords,updatedAt:'2026-11-07T10:00:00.000Z'};
+
+test('shared set preview saves an independent copy, studies offline and avoids duplicate copies',async({page,context})=>{
+ await page.setViewportSize({width:390,height:844});
+ await page.route(`**/api/shares/${sharedId}`,route=>route.fulfill({json:sharedSet}));
+ await page.goto(`/share/${sharedId}`);
+ await expect(page.getByRole('heading',{name:sharedSet.name,exact:true})).toBeVisible();
+ await expect(page.locator('.shared-word')).toHaveCount(2);
+ await page.screenshot({path:'test-results/shared-390.png',fullPage:true});
+ await expect(page.getByRole('region',{name:'Browser-only storage'})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+ await page.getByLabel('Save to folder',{exact:true}).selectOption('mandarin-class');
+ await page.getByRole('button',{name:'Add to library',exact:true}).click();
+ await expect(page.getByRole('heading',{name:sharedSet.name+'.',exact:true})).toBeVisible();
+ const state=await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state);
+ const saved=state.sets.find((s:{sourceShareId?:string})=>s.sourceShareId==='a3278291-32e0-4dbb-bbcb-013968d04c98');
+ expect(saved).toBeTruthy();expect(saved.id).not.toBe('source-set');
+ const copied=state.entries.filter((e:{setId:string})=>e.setId===saved.id);
+ expect(copied).toHaveLength(2);expect(copied.map((e:{id:string})=>e.id)).not.toContain('shared-one');
+ expect(copied[0].notes).toBe('Class vocabulary');expect(copied[0].tags).toEqual(['school']);
+ expect(state.progress).toEqual({});expect(state.stars).toEqual({});
+ await page.getByRole('button',{name:'Study set',exact:true}).click();
+ await page.getByRole('button',{name:'Start studying',exact:true}).click();
+ // Once copied, studying does not depend on the sharing endpoint or network.
+ await context.setOffline(true);
+ await page.getByRole('button',{name:'Reveal answer',exact:true}).click();
+ await page.getByRole('button',{name:'Know',exact:true}).click();
+ await expect(page.locator('.session-header')).toContainText('2 / 2');
+ await context.setOffline(false);
+ await page.goto(`/share/${sharedId}`);
+ await expect(page.getByRole('button',{name:'Open your copy',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Add to library',exact:true})).toHaveCount(0);
+ await page.getByRole('button',{name:'Open your copy',exact:true}).click();
+ await expect(page.getByRole('heading',{name:sharedSet.name+'.',exact:true})).toBeVisible();
+ const restored=await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state);
+ expect(restored.sets.filter((s:{sourceShareId?:string})=>s.sourceShareId==='a3278291-32e0-4dbb-bbcb-013968d04c98')).toHaveLength(1);
+ expect(Object.keys(restored.progress)).toHaveLength(1);
+ expect(restored.progress[copied[0].id+':chinese'].lastResult).toBe('know');
+});
+
+test('unavailable shared links explain failure and can retry without adding a set',async({page})=>{
+ let available=false;
+ await page.route(`**/api/shares/${sharedId}`,route=>available?route.fulfill({json:sharedSet}):route.fulfill({status:404,json:{error:'This shared set is unavailable.'}}));
+ await page.goto(`/share/${sharedId}`);
+ await expect(page.getByRole('heading',{name:'Set unavailable',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Add to library',exact:true})).toHaveCount(0);
+ expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state.sets)).toHaveLength(1);
+ available=true;
+ await page.getByRole('button',{name:'Try again',exact:true}).click();
+ await expect(page.getByRole('heading',{name:sharedSet.name,exact:true})).toBeVisible();
+});
+
+test('guests cannot publish shared links',async({page})=>{
+ let published=0;
+ await page.route('**/api/shares**',route=>{published++;return route.fulfill({status:401,json:{error:'Sign in'}});});
+ await page.goto('/');
+ await page.locator('.set-open').first().click();
+ await page.getByRole('button',{name:'Share',exact:true}).click();
+ await expect(page.getByRole('dialog').getByRole('heading',{name:'Share set',exact:true})).toBeVisible();
+ await expect(page.getByRole('button',{name:'Create link',exact:true})).toHaveCount(0);
+ expect(published).toBe(0);
+});
