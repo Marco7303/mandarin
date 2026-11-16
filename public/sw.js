@@ -1,4 +1,4 @@
-const CACHE = 'mori-shell-v15';
+const CACHE = 'mori-shell-v16';
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
