@@ -2913,3 +2913,16 @@ select {
 .account-identity small { color:var(--muted); }
 .profile strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:142px; display:block; }
 @media (max-width:600px) { .public-name-controls { flex-wrap:wrap; } .public-name-controls input { flex-basis:100%; } }
+
+.session-shuffle {
+  margin-left:auto;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  min-height:44px;
+  flex-shrink:0;
+}
+.session-shuffle:disabled {
+  opacity:0.4;
+  cursor:default;
+}

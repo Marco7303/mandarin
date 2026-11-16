@@ -1,6 +1,45 @@
 import {test,expect} from '@playwright/test';
 import path from 'node:path';
 
+test('shuffle keeps the selected batch, current card, answer history and undo', async ({page}) => {
+ await page.setViewportSize({width:390,height:844});
+ await page.goto('/');
+ await page.getByRole('button',{name:'Study cards',exact:true}).click();
+ await page.getByRole('combobox',{name:/ORDER/}).selectOption('Original');
+ await page.getByRole('combobox',{name:/AMOUNT/}).selectOption('20');
+ await page.getByRole('button',{name:'Start studying',exact:true}).click();
+ const original = await page.evaluate(() => JSON.parse(localStorage.getItem('mori-v2:guest')!).state.entries.slice(0,20).map((e:{id:string;traditional:string})=>({id:e.id,traditional:e.traditional})));
+ const prompt=page.locator('.card-prompt');
+ await expect(prompt).toHaveText(original[0].traditional);
+ await page.getByRole('button',{name:'Reveal answer',exact:true}).click();
+ await page.getByRole('button',{name:'Know',exact:true}).click();
+ await expect(prompt).toHaveText(original[1].traditional);
+ await page.getByRole('button',{name:'Reveal answer',exact:true}).click();
+ await page.evaluate(()=>{Math.random=()=>0;});
+ await page.getByRole('button',{name:'Shuffle',exact:true}).click();
+ await expect(prompt).toHaveText(original[1].traditional);
+ await expect(page.getByRole('button',{name:'Hide answer',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Undo last answer',exact:true}).click();
+ await expect(prompt).toHaveText(original[0].traditional);
+ await page.getByRole('button',{name:'Know',exact:true}).click();
+ await expect(prompt).toHaveText(original[1].traditional);
+ const seen=[original[0].traditional];
+ for(let i=1;i<20;i++) {
+  seen.push(await prompt.innerText());
+  await expect(page.locator('.session-header')).toContainText(`${i+1} / 20`);
+  if(i>=18) await expect(page.getByRole('button',{name:'Shuffle',exact:true})).toBeDisabled();
+  await page.getByRole('button',{name:'Reveal answer',exact:true}).click();
+  await page.getByRole('button',{name:'Know',exact:true}).click();
+ }
+ expect(seen[2]).toBe(original[3].traditional);
+ expect(seen.slice().sort()).toEqual(original.map((e:{traditional:string})=>e.traditional).sort());
+ await expect(page.getByRole('heading',{name:'Session complete'})).toBeVisible();
+ const progress=await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state.progress);
+ expect(Object.keys(progress).sort()).toEqual(original.map((e:{id:string})=>`${e.id}:chinese`).sort());
+ expect(Object.values(progress).every(p=>(p as {reviewCount:number}).reviewCount===1)).toBe(true);
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+});
+
 test('create and edit vocabulary, aligned pronunciation, independent fronts and stars',async({page})=>{
  await page.goto('/');
  await expect(page.getByRole('heading',{name:'Your study space'})).toBeVisible();

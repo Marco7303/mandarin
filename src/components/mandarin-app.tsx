@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowDownToLine, ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, ChevronRight, Folder as FolderIcon, Home, Leaf, MoreHorizontal, Plus, Search, Settings, Sparkles, Star, Upload, X, RotateCcw, WifiOff, Cloud, Archive, Pencil, Copy, Trash2, Share2, Compass } from 'lucide-react';
+import { ArrowDownToLine, ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, ChevronRight, Folder as FolderIcon, Home, Leaf, MoreHorizontal, Plus, Search, Settings, Sparkles, Star, Upload, X, RotateCcw, WifiOff, Cloud, Archive, Pencil, Copy, Trash2, Share2, Compass, Shuffle } from 'lucide-react';
 import seed from '@/data/unit1.json';
 import { CharacterExplorer } from './character-explorer';
 import { ShareSet, SharedSetPreview } from './set-sharing';
@@ -395,6 +395,17 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
         if (index + 1 >= queue.length) setScreen('result');
         else setIndex(i => i + 1);
         setRevealed(false);  }, [current, revealed, data.progress, queue.length, index]);
+    function shuffleRemaining() {
+        setQueue(previous => {
+            const remaining = previous.slice(index + 1);
+            for (let i = remaining.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [remaining[i], remaining[j]] = [remaining[j], remaining[i]];
+            }
+            return [...previous.slice(0, index + 1), ...remaining];
+        });
+        notify('Remaining cards shuffled');
+    }
     function undo() { const last = answers[answers.length - 1]; if (!last) return;
         const id = key(last.prompt.entryId, last.prompt.direction);
         update(d => { const progress = { ...d.progress }; if (last.previous) progress[id] = last.previous; else delete progress[id]; return { ...d, progress }; });
@@ -536,7 +547,7 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
         <div className="form-two"><label>ORDER<select value={data.preferences.order} onChange={e => update(d => ({ ...d, preferences: { ...d.preferences, order: e.target.value } }))}>{['Original', 'Random'].map(o => <option key={o}>{o}</option>)}</select></label><label>AMOUNT<select value={data.preferences.amount} onChange={e => update(d => ({ ...d, preferences: { ...d.preferences, amount: e.target.value } }))}>{['10', '20', '30', 'All'].map(o => <option key={o}>{o}</option>)}</select></label></div><button className="button primary full start-button" onClick={() => startSession()}>Start studying <ArrowRight size={18}/></button><span className="setup-footnote">Know moves a card to Learned until you move it back or reset the set. Progress is separate for each front.</span></section></div>
       </>}
       {screen === 'session' && current && currentEntry && <div className="session"><div className="session-header"><button className="icon-button" aria-label="End session" onClick={() => { if (window.confirm('End this session? Your answers are already saved.'))
-                navigate('home'); }}><X size={21}/></button><span>{Math.min(index + 1, queue.length)} <span className="muted">/ {queue.length}</span></span><button className="icon-button" disabled={!answers.length} aria-label="Undo last answer" onClick={undo}><RotateCcw size={19}/></button></div><div className="session-track"><span style={{ width: `${index / queue.length * 100}%` }}/></div><div className="session-context">{data.sets.find(s => s.id === currentEntry.setId)?.name}<span>·</span>{labels[current.direction]}</div>
+                navigate('home'); }}><X size={21}/></button><span>{Math.min(index + 1, queue.length)} <span className="muted">/ {queue.length}</span></span><button className="icon-button" disabled={!answers.length} aria-label="Undo last answer" onClick={undo}><RotateCcw size={19}/></button></div><div className="session-track"><span style={{ width: `${index / queue.length * 100}%` }}/></div><div className="session-context">{data.sets.find(s => s.id === currentEntry.setId)?.name}<span>·</span>{labels[current.direction]}<button type="button" className="text-button session-shuffle" disabled={queue.length - index - 1 < 2} title="Shuffle the remaining cards in this session" onClick={shuffleRemaining}><Shuffle size={15}/>Shuffle</button></div>
       <div className={cn('flashcard', revealed && 'revealed')} onTouchStart={e => { touchStart.current = e.touches[0].clientX; }} onTouchEnd={e => { if (touchStart.current === null)
                 return; const delta = e.changedTouches[0].clientX - touchStart.current; touchStart.current = null; if (revealed && Math.abs(delta) > 75)
                 answer(delta > 0); }}><div className="flashcard-top"><span>{labels[current.direction].toUpperCase()}</span><button className={cn('icon-button', data.stars[key(currentEntry.id, current.direction)] && 'is-starred')} aria-label={data.stars[key(currentEntry.id, current.direction)] ? 'Unstar prompt' : 'Star prompt'} onClick={() => toggleStar(currentEntry.id, current.direction)}><Star size={23} fill={data.stars[key(currentEntry.id, current.direction)] ? 'currentColor' : 'none'}/></button></div><button className="card-face" onClick={toggleAnswer} aria-expanded={revealed} aria-label={revealed ? 'Hide answer' : 'Reveal answer'}><span className={cn('card-prompt', current.direction === 'chinese' && 'chinese')} lang={current.direction === 'chinese' ? 'zh-Hant-TW' : 'en'}>{current.direction === 'chinese' ? currentEntry.traditional : current.direction === 'pinyin' ? currentEntry.pinyin : currentEntry.english}</span>{revealed ? <div className="card-answer">{current.direction !== 'chinese' && <span className="answer-chinese chinese" lang="zh-Hant-TW">{currentEntry.traditional}</span>}{current.direction !== 'pinyin' && <span className="answer-pinyin">{currentEntry.pinyin}</span>}{current.direction !== 'english' && <span className="answer-english">{currentEntry.english}</span>}</div> : <span className="tap-hint">Tap to reveal <span className="desktop-hint">· press space</span></span>}</button>{revealed && <CharacterExplorer key={currentEntry.id} word={currentEntry.traditional}/>}</div>
