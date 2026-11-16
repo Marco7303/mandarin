@@ -408,7 +408,6 @@ test('character reference is optional, navigable, keyboard-safe and available of
  await expect(reference).toContainText('亻');
  await reference.getByText('Common words',{exact:true}).click();
  await expect(reference.getByText('你好',{exact:true})).toBeVisible();
- await reference.getByText('Stroke order',{exact:true}).click();
  await expect(page.getByRole('img',{name:'Stroke order for 你: 7 of 7 strokes'})).toBeVisible();
  await page.screenshot({path:'test-results/character-strokes-mobile.png',fullPage:true});
  await page.getByRole('button',{name:'Reset strokes'}).click();
@@ -435,7 +434,6 @@ test('character reference is optional, navigable, keyboard-safe and available of
  await page.getByRole('button',{name:'Reveal answer',exact:true}).click();
  await page.locator('.character-explorer > summary').click();
  await expect(reference).toContainText('Verified on Dong Chinese');
- await reference.getByText('Stroke order',{exact:true}).click();
  await expect(page.getByRole('img',{name:'Stroke order for 你: 7 of 7 strokes'})).toBeVisible();
  await context.setOffline(false);
 });

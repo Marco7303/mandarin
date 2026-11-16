@@ -60,8 +60,8 @@ function CharacterEntry({ character, onSelect }: { character: string; onSelect: 
 }
 
 function StrokeSection({ character }: { character: string }) {
-    const [open, setOpen] = useState(false);
-    return <details className="character-section character-subsection" onToggle={event => { event.stopPropagation(); setOpen(event.currentTarget.open); }}><summary>Stroke order <ChevronDown size={14}/></summary>{open && <StrokeLoader character={character}/>}</details>;
+    const [open, setOpen] = useState(true);
+    return <details open={open} className="character-section character-subsection" onToggle={event => { event.stopPropagation(); setOpen(event.currentTarget.open); }}><summary>Stroke order <ChevronDown size={14}/></summary>{open && <StrokeLoader character={character}/>}</details>;
 }
 
 function StrokeLoader({ character }: { character: string }) {
