@@ -1,6 +1,34 @@
 import {test,expect} from '@playwright/test';
 import path from 'node:path';
 
+test('refresh preserves the set, folder overview and search, with study returning to setup', async ({page}) => {
+ await page.goto('/');
+ await page.getByRole('heading',{name:'Your study space'}).waitFor();
+ await page.locator('.set-open').first().click();
+ await page.getByRole('textbox',{name:'Search words',exact:true}).fill('thank');
+ await page.reload();
+ await expect(page.getByRole('heading',{name:'Unit 1'})).toBeVisible();
+ await expect(page.getByRole('textbox',{name:'Search words',exact:true})).toHaveValue('thank');
+ await expect(page.locator('.word-row')).toHaveCount(1);
+ await page.getByRole('button',{name:'Study set',exact:true}).click();
+ await page.getByRole('button',{name:'Start studying',exact:true}).click();
+ await page.getByRole('button',{name:'Reveal answer',exact:true}).click();
+ await page.getByRole('button',{name:'Know',exact:true}).click();
+ await page.reload();
+ await expect(page.getByRole('heading',{name:'Study options'})).toBeVisible();
+ await expect(page.locator('#study-set')).toHaveValue('unit-1');
+ const progress=await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state.progress);
+ expect(Object.keys(progress)).toHaveLength(1);
+ await page.getByRole('button',{name:'Mandarin Class',exact:true}).click();
+ await page.getByRole('textbox',{name:'Search sets and words'}).fill('Unit');
+ await page.reload();
+ await expect(page.getByRole('heading',{name:'Mandarin Class',exact:true})).toBeVisible();
+ await expect(page.getByRole('textbox',{name:'Search sets and words'})).toHaveValue('Unit');
+ await page.getByRole('button',{name:'Settings',exact:false}).first().click();
+ await page.reload();
+ await expect(page.getByRole('heading',{name:'Settings',exact:true})).toBeVisible();
+});
+
 test('shuffle keeps the selected batch, current card, answer history and undo', async ({page}) => {
  await page.setViewportSize({width:390,height:844});
  await page.goto('/');

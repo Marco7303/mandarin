@@ -143,10 +143,35 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
         const linkId = window.location.pathname.match(/^\/share\/([^/]+)\/?$/)?.[1];
         if (linkId) setIncomingShareId(linkId);
         setScreen(linkId ? 'shared' : window.location.pathname.replace(/\/$/, '') === '/explore' ? 'explore' : 'home');
+        setActiveFolder('all');
+        setShowArchived(false);
+        setQuery('');
+        if (!linkId && window.location.pathname === '/') {
+            try {
+                const view = JSON.parse(sessionStorage.getItem(`mori-view:${owner}`) || 'null');
+                if (view && ['home', 'sets', 'detail', 'setup', 'settings'].includes(view.screen)) {
+                    const ids = Array.isArray(view.selectedSets) ? state.sets.filter(s => view.selectedSets.includes(s.id)).map(s => s.id) : [];
+                    setSelectedSets(ids);
+                    setActiveFolder(state.folders.some(f => f.id === view.folder) ? view.folder : 'all');
+                    setShowArchived(view.archived === true);
+                    setQuery(typeof view.query === 'string' ? view.query : '');
+                    setScreen(view.screen === 'detail' && !ids.length ? 'sets' : view.screen);
+                }
+            } catch { /* A missing or invalid saved view must not block the library. */ }
+        }
         setModal(null);
         setReady(true);
         return state;
     }, []);
+    useEffect(() => {
+        if (!ready || screen === 'shared' || screen === 'explore') return;
+        try {
+            sessionStorage.setItem(`mori-view:${libraryMeta.current.owner}`, JSON.stringify({
+                screen: screen === 'session' || screen === 'result' ? 'setup' : screen,
+                selectedSets, folder: activeFolder, archived: showArchived, query,
+            }));
+        } catch { /* Navigation still works when browser storage is unavailable. */ }
+    }, [ready, screen, selectedSets, activeFolder, showArchived, query]);
     useEffect(() => { let cancelled = false; const initialize = async () => { try {
         const session = await getSession();
         if (cancelled)
