@@ -814,6 +814,28 @@ h3 {
   min-height:44px;
   margin:-16px 0 22px;
 }
+.set-learning-summary {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:12px;
+  margin:20px 0;
+  padding:16px 0;
+  border-top:1px solid var(--line);
+}
+.set-learning-summary dt {
+  font-size:12px;
+  color:var(--ink);
+}
+.set-learning-summary dd {
+  margin:5px 0 0;
+  font-size:12px;
+  color:var(--muted);
+}
+.set-learning-summary strong {
+  color:var(--green);
+  font-size:20px;
+  font-weight:600;
+}
 .word-list {
   margin-top:12px;
   border-top:1px solid var(--line);
@@ -850,6 +872,17 @@ h3 {
   font-size:13px;
   color:#7b8672;
   line-height:1.6;
+}
+.word-status {
+  display:block;
+  margin-top:5px;
+  font-size:11px;
+  line-height:1.5;
+  color:var(--muted);
+  overflow-wrap:anywhere;
+}
+.word-status-learned {
+  color:var(--green);
 }
 .word-actions {
   display:flex;
