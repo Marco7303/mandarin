@@ -1,6 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import type { SharedDeck } from '../src/lib/sharing-schema';
 import seed from '../src/data/unit1.json';
+import { installExistingLibrary } from './library-fixture';
 
 // Keep HTTP fixtures in Playwright's routing layer. The separate app suite
 // exercises the real service worker and offline storage.
@@ -8,7 +9,8 @@ test.use({ serviceWorkers: 'block' });
 
 // These tests use the real Stack browser SDK against controlled HTTP fixtures.
 // No real credentials, accounts, emails, or hosted data are used.
-async function installCloudFixture(page: Page) {
+async function installCloudFixture(page: Page, existingLibrary = true) {
+    if (existingLibrary) await installExistingLibrary(page, ['guest', 'a@example.com', 'b@example.com', 'new@example.com', 'verify@example.com', 'recipient@example.com', 'folder-owner@example.com', 'private@example.com', 'reporter@example.com', 'existing-profile@example.com', 'different-profile@example.com', 'profile-retry@example.com']);
     let email = 'a@example.com', restricted = false;
     const libraries = new Map<string, { state: Record<string, unknown>; revision: number; updatedAt: string }>();
     let failWrites = false;
@@ -193,7 +195,7 @@ test('wrong credentials stay in the unchanged form with a readable error', async
     await expect(page.getByRole('button', { name: 'Sign in', exact: true }).last()).toBeEnabled();
 });
 
-test('signup uses the existing form and seeds an active account from Excel', async ({ page }) => {
+test('signup preserves an existing local account library', async ({ page }) => {
     const fixture = await installCloudFixture(page); await page.goto('/', {waitUntil:'domcontentloaded'}); await openSignIn(page);
     await page.getByLabel('Email', { exact: true }).fill('new@example.com');
     await page.getByLabel('Password', { exact: true }).fill('password123');
@@ -538,6 +540,7 @@ test('an existing account edits its public name in Settings, reuses it when publ
  await expect(dialog).toContainText('Taiwan learner');
  await dialog.getByRole('button', { name: 'Close dialog', exact: true }).click();
  await page.route('**/api/shares**', route => route.fulfill({ json: { share: null } }));
+ await page.getByRole('button', { name: 'Home', exact: true }).click();
  await page.locator('.set-open').first().click();
  await page.getByRole('button', { name: 'Share', exact: true }).click();
  await dialog.getByRole('radio', { name: /^Public/ }).check();
@@ -574,4 +577,15 @@ test('profile loading can fail, retry and recover without blocking study or losi
  await context.setOffline(false);
  await expect(page.getByRole('textbox', { name: 'Public name', exact: true })).toHaveValue('Recovered learner');
  expect(fixture.unexpected).toEqual([]);
+});
+
+
+test('a new account syncs an empty library without adding starter vocabulary', async ({page}) => {
+ const fixture=await installCloudFixture(page,false);
+ await page.goto('/',{waitUntil:'domcontentloaded'});
+ await signIn(page,'new@example.com');
+ await expect.poll(()=>fixture.libraries.get('new@example.com')?.revision).toBe(1);
+ const state=fixture.libraries.get('new@example.com')!.state;
+ expect(state.entries).toEqual([]); expect(state.sets).toEqual([]); expect(state.folders).toEqual([]);
+ await expect(page.locator('.set-open')).toHaveCount(0);
 });

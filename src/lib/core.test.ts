@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { alignCharacters, normalizePinyin } from './pinyin';
 import { buildQueue, makeEntry, progressKey, recordAnswer, isLearned, normalizeStudyPreferences, resetProgress, searchEntry } from './core';
 import { exportCSV, parseRows, parseText, validateEntries, preflightXlsxArchive, parseFile } from './importer';
@@ -48,6 +48,18 @@ describe('progress and stars', () => {
         expect(buildQueue(entries, progress, {}, options).map(p => p.entryId)).toEqual(['learning', 'unseen']);
         expect(buildQueue(entries, progress, {}, { ...options, cards: 'all' })).toHaveLength(3);
     });
+    it('shuffles only the first eligible batch, including its first card', () => {
+        const entries = Array.from({ length: 30 }, (_, i) => makeEntry({ id: String(i), traditional: '你', english: 'you', pinyin: 'nǐ' }));
+        const progress = { '0:chinese': recordAnswer(undefined, true) };
+        const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+        try {
+            const queue = buildQueue(entries, progress, {}, { prompt: 'chinese', cards: 'learning', order: 'random', amount: 20 });
+            expect(queue).toHaveLength(20);
+            expect(queue[0].entryId).toBe('2');
+            expect(queue.map(p => Number(p.entryId)).sort((a, b) => a - b)).toEqual(Array.from({ length: 20 }, (_, i) => i + 1));
+            expect(normalizeStudyPreferences({ filter: 'Learning', order: 'Shuffle' }).order).toBe('Shuffle');
+        } finally { random.mockRestore(); }
+    });
     it('resets only the chosen words across all fronts', () => {
         const progress = { '1:chinese': recordAnswer(undefined, true), '1:english': recordAnswer(undefined, true), '2:chinese': recordAnswer(undefined, true) };
         expect(Object.keys(resetProgress(progress, ['1']))).toEqual(['2:chinese']);
@@ -55,7 +67,7 @@ describe('progress and stars', () => {
     });
     it('replaces legacy study filters and orders without losing other preferences', () => {
         for (const filter of ['Due', 'New', 'Difficult']) expect(normalizeStudyPreferences({ filter, order: 'Review order', prompt: 'pinyin' })).toEqual({ filter: 'Learning', order: 'Original', prompt: 'pinyin' });
-        expect(normalizeStudyPreferences({ filter: 'Learned', order: 'Random' })).toEqual({ filter: 'Learned', order: 'Random' });
+        expect(normalizeStudyPreferences({ filter: 'Learned', order: 'Random' })).toEqual({ filter: 'Learned', order: 'Shuffle' });
     });
     it('uses the original English dimension for mixed starred study', () => {
         const e = makeEntry({ id: '1', traditional: '學生', english: 'student', pinyin: 'xuéshēng' });

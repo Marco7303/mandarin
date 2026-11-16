@@ -1,5 +1,48 @@
 import {test,expect} from '@playwright/test';
 import path from 'node:path';
+import { installExistingLibrary } from './library-fixture';
+
+test('new visitors start empty and can create their first set without a folder', async ({page}) => {
+ await page.goto('/');
+ await expect(page.getByRole('heading',{name:'Your study space'})).toBeVisible();
+ await expect(page.locator('.set-open')).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'Study cards',exact:true})).toBeDisabled();
+ const initial=await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state);
+ expect(initial.folders).toEqual([]); expect(initial.sets).toEqual([]); expect(initial.entries).toEqual([]);
+ await page.getByRole('button',{name:'Create a study set'}).click();
+ await page.getByRole('button',{name:'Continue in this browser',exact:true}).click();
+ await page.getByLabel('Name',{exact:true}).fill('My first set');
+ await page.getByRole('button',{name:'Create',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'My first set'})).toBeVisible();
+ await page.getByRole('button',{name:'Add word'}).first().click();
+ await page.getByLabel('Traditional Chinese',{exact:true}).fill('你好');
+ await page.getByLabel('Pinyin',{exact:true}).fill('nǐ hǎo');
+ await page.getByLabel('English',{exact:true}).fill('hello');
+ await page.getByRole('button',{name:'Save word'}).click();
+ await page.reload();
+ await expect(page.locator('.word-row')).toHaveCount(1);
+ const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state);
+ expect(saved.sets).toHaveLength(1); expect(saved.folders).toHaveLength(1); expect(saved.entries).toHaveLength(1);
+ expect(saved.sets[0].folderId).toBe(saved.folders[0].id);
+});
+
+test('new visitors can import directly into an empty library', async ({page}) => {
+ await page.goto('/');
+ await page.getByRole('button',{name:'All sets',exact:false}).first().click();
+ await page.getByRole('button',{name:'Import',exact:true}).click();
+ await page.getByRole('textbox',{name:'Paste vocabulary'}).fill('你好\thello\tnǐ hǎo');
+ await page.getByRole('button',{name:'Preview words'}).click();
+ await expect(page.getByRole('combobox',{name:'Destination',exact:true})).toHaveValue('new');
+ await page.getByRole('button',{name:'Import 1 words',exact:true}).click();
+ await expect(page.locator('.word-row')).toHaveCount(1);
+ const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state);
+ expect(saved.sets).toHaveLength(1); expect(saved.entries).toHaveLength(1);
+ expect(saved.sets[0].folderId).toBe(saved.folders[0].id);
+ expect(saved.entries[0].setId).toBe(saved.sets[0].id);
+});
+
+test.describe('existing libraries', () => {
+ test.beforeEach(async ({page}) => { await installExistingLibrary(page); });
 
 test('refresh preserves the set, folder overview and search, with study returning to setup', async ({page}) => {
  await page.goto('/');
@@ -27,6 +70,29 @@ test('refresh preserves the set, folder overview and search, with study returnin
  await page.getByRole('button',{name:'Settings',exact:false}).first().click();
  await page.reload();
  await expect(page.getByRole('heading',{name:'Settings',exact:true})).toBeVisible();
+});
+
+test('study options shuffle the selected twenty cards before the first card', async ({page}) => {
+ await page.goto('/');
+ await page.getByRole('button',{name:'Study cards',exact:true}).click();
+ await page.getByRole('combobox',{name:/ORDER/}).selectOption('Shuffle');
+ await page.getByRole('combobox',{name:/AMOUNT/}).selectOption('20');
+ await page.reload();
+ await expect(page.getByRole('combobox',{name:/ORDER/})).toHaveValue('Shuffle');
+ const original = await page.evaluate(() => {
+  Math.random=()=>0;
+  return JSON.parse(localStorage.getItem('mori-v2:guest')!).state.entries.slice(0,20).map((e:{traditional:string})=>e.traditional);
+ });
+ await page.getByRole('button',{name:'Start studying',exact:true}).click();
+ await expect(page.locator('.card-prompt')).toHaveText(original[1]);
+ const seen=[];
+ for(let i=0;i<20;i++) {
+  seen.push(await page.locator('.card-prompt').innerText());
+  await page.getByRole('button',{name:'Reveal answer',exact:true}).click();
+  await page.getByRole('button',{name:'Know',exact:true}).click();
+ }
+ expect(seen.slice().sort()).toEqual(original.slice().sort());
+ await expect(page.getByRole('heading',{name:'Session complete'})).toBeVisible();
 });
 
 test('shuffle keeps the selected batch, current card, answer history and undo', async ({page}) => {
@@ -173,7 +239,7 @@ test('local auth explanation, manifest and offline preservation',async({page,con
  await context.setOffline(true);
  await page.keyboard.press('Space');await page.keyboard.press('ArrowRight');
  const progress=await page.evaluate(()=>JSON.parse(localStorage.getItem('mori-v2:guest')!).state.progress);expect(Object.keys(progress).length).toBe(1);
- await page.reload();await expect(page.getByRole('heading',{name:'Your study space'})).toBeVisible();
+ await page.reload();await expect(page.getByRole('heading',{name:'Study options'})).toBeVisible();
  expect(await page.evaluate(()=>Object.keys(JSON.parse(localStorage.getItem('mori-v2:guest')!).state.progress).length)).toBe(1);
  await context.setOffline(false);
 });
@@ -496,7 +562,7 @@ test('character reference is optional, navigable, keyboard-safe and available of
  // Clear in-memory modules by reloading. Public dictionary shards survive in CacheStorage.
  await page.reload();
  await context.setOffline(true);
- await page.getByRole('button',{name:'Study cards',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Study options'})).toBeVisible();
  await page.getByRole('button',{name:'Start studying',exact:true}).click();
  await page.getByRole('button',{name:'Reveal answer',exact:true}).click();
  await page.locator('.character-explorer > summary').click();
@@ -627,4 +693,6 @@ test('guests are prompted to sign in before publishing a folder', async ({ page 
  await page.getByRole('button', { name: 'Share folder', exact: true }).click();
  await expect(page.getByRole('dialog')).toContainText('Create an account or sign in to share this folder.');
  expect(published).toBe(0);
+});
+
 });

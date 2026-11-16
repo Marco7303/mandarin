@@ -59,7 +59,7 @@ export function resetProgress(progress: ProgressMap, entryIds: string[]): Progre
 export function normalizeStudyPreferences<T extends { filter: string; order: string }>(preferences: T): T {
     return { ...preferences,
         filter: ['Learning', 'Learned', 'All', 'Starred'].includes(preferences.filter) ? preferences.filter : 'Learning',
-        order: preferences.order === 'Random' ? 'Random' : 'Original',
+        order: ['Random', 'Shuffle'].includes(preferences.order) ? 'Shuffle' : 'Original',
     };
 }
 export type Prompt = {
@@ -85,7 +85,13 @@ export function buildQueue(entries: Entry[], progress: ProgressMap, stars: StarM
             ? [eligible[Math.floor(Math.random() * eligible.length)]] : eligible;
         queue.push(...selected.map(direction => ({ entryId: entry.id, direction })));
     }
-    if (options.order === 'random')
-        queue = queue.map(p => ({ p, r: Math.random() })).sort((a, b) => a.r - b.r).map(x => x.p);
-    return options.amount === 'all' ? queue : queue.slice(0, options.amount);
+    // Choose the batch first so shuffling never pulls in later words.
+    if (options.amount !== 'all') queue = queue.slice(0, options.amount);
+    if (options.order === 'random') {
+        for (let i = queue.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [queue[i], queue[j]] = [queue[j], queue[i]];
+        }
+    }
+    return queue;
 }
