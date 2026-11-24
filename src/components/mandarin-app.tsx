@@ -1,4 +1,6 @@
 'use client';
+import dynamic from 'next/dynamic';
+import { buildWritingQueue, type WritingLevel, type WritingPrompt } from '@/lib/writing';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDownToLine, ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, ChevronRight, Folder as FolderIcon, Home, Leaf, MoreHorizontal, Plus, Search, Settings, Sparkles, Star, Upload, X, RotateCcw, WifiOff, Cloud, Archive, Pencil, Copy, Trash2, Share2, Compass, Shuffle } from 'lucide-react';
 import { CharacterExplorer } from './character-explorer';
@@ -9,6 +11,8 @@ import type { SharedDeck } from '@/lib/sharing-schema';
 import { buildQueue, isLearned, makeEntry, normalizeStudyPreferences, recordAnswer, resetProgress, searchEntry, type Entry, type Direction, type Progress } from '@/lib/core';
 import { parseFile, parseText, exportCSV, validateEntries, type ImportResult } from '@/lib/importer';
 import { getClient, getSession, onAuthStateChange, getCloudRevision, loadCloud, saveCloud, signIn, signUp, signOut } from '@/lib/cloud';
+const WritingPractice = dynamic(() => import('./writing-practice'), { ssr: false, loading: () => <p role="status">Loading writing practice…</p> });
+
 type Folder = {
     sourceShareId?: string;
     id: string;
@@ -36,7 +40,7 @@ type State = {
     stars: Record<string, boolean>;
     preferences: Preferences;
 };
-type Screen = 'home' | 'sets' | 'detail' | 'setup' | 'session' | 'result' | 'settings' | 'shared' | 'explore';
+type Screen = 'home' | 'sets' | 'detail' | 'setup' | 'session' | 'result' | 'settings' | 'shared' | 'explore' | 'writing';
 type Prompt = {
     entryId: string;
     direction: Direction;
@@ -77,6 +81,11 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
         previous?: Progress;
     }[]>([]);
     const [sessionTotal, setSessionTotal] = useState(0);
+    const [studyMode, setStudyMode] = useState<'flashcards' | 'writing'>('flashcards');
+    const [writingLevel, setWritingLevel] = useState<WritingLevel>('trace');
+    const [writingPrompt, setWritingPrompt] = useState<WritingPrompt>('both');
+    const [writingStarred, setWritingStarred] = useState(false);
+    const [writingEntries, setWritingEntries] = useState<Entry[]>([]);
     const [importResult, setImportResult] = useState<ImportResult | null>(null);
     const [importBusy, setImportBusy] = useState(false);
     const [importText, setImportText] = useState('');
@@ -138,6 +147,8 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
         setData(state);
         setSelectedSets(state.sets[0] ? [state.sets[0].id] : []);
         setQueue([]);
+        setWritingEntries([]);
+        setStudyMode('flashcards');
         setAnswers([]);
         const linkId = window.location.pathname.match(/^\/share\/([^/]+)\/?$/)?.[1];
         if (linkId) setIncomingShareId(linkId);
@@ -166,7 +177,7 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
         if (!ready || screen === 'shared' || screen === 'explore') return;
         try {
             sessionStorage.setItem(`mori-view:${libraryMeta.current.owner}`, JSON.stringify({
-                screen: screen === 'session' || screen === 'result' ? 'setup' : screen,
+                screen: screen === 'session' || screen === 'result' || screen === 'writing' ? 'setup' : screen,
                 selectedSets, folder: activeFolder, archived: showArchived, query,
             }));
         } catch { /* Navigation still works when browser storage is unavailable. */ }
@@ -393,6 +404,14 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
     function openSet(id: string) { setSelectedSets([id]); navigate('detail'); }
     function setup(ids = selectedSets, filter = 'Learning') { setSelectedSets(ids);
         update(d => ({ ...d, preferences: { ...d.preferences, filter, ...(filter === 'Starred' ? { prompt: 'mixed' as const } : {}) } })); navigate('setup'); }
+    function startWriting() {
+        const batch = buildWritingQueue(selectedEntries, data.stars, {
+            starred: writingStarred, amount: data.preferences.amount === 'All' ? 'all' : Number(data.preferences.amount), shuffle: data.preferences.order === 'Shuffle',
+        });
+        if (!batch.length) { notify('No Chinese words match. Choose another set or include all words.'); return; }
+        setWritingEntries(batch);
+        navigate('writing');
+    }
     function startSession(only?: Prompt[]) {
         const pref = data.preferences;
         const prompts: Prompt[] = only || buildQueue(selectedEntries, data.progress, data.stars, {
@@ -526,7 +545,7 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
     const sharedFolderCopy = data.folders.find(f => f.sourceShareId === incomingShareId);
     const sharedCopy = data.sets.find(s => s.sourceShareId === incomingShareId);
     const visibleSets = sets.filter(s => (activeFolder === 'all' || s.folderId === activeFolder) && (!query || s.name.toLowerCase().includes(query.toLowerCase()) || entries.some(e => e.setId === s.id && searchEntry(e, query))));
-    const isStudy = screen === 'session' || screen === 'result';
+    const isStudy = screen === 'session' || screen === 'result' || screen === 'writing';
     return <div className="app-shell" onFocusCapture={e => { if (!modal)
         focusBeforeModal.current = e.target as HTMLElement; }}>
     <a className="skip-link" href="#main-content">Skip to content</a><aside className={cn('sidebar', isStudy && 'study-sidebar')}>
@@ -572,10 +591,17 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
       </>}
       {screen === 'setup' && <>
         <button className="back-link" onClick={() => navigate('home')}><ArrowLeft size={16}/>Home</button><div className="setup-layout"><div className="setup-intro"><h1>Study</h1><div className="setup-glyph" lang="zh-Hant-TW" aria-hidden="true">習</div></div><section className="setup-panel"><h2>Study options</h2><label className="field-label" htmlFor="study-set">STUDY SET</label><select id="study-set" value={selectedSets.length === 1 ? selectedSets[0] : 'all'} onChange={e => setSelectedSets(e.target.value === 'all' ? activeSets.map(s => s.id) : [e.target.value])}><option value="all">{selectedSets.length > 1 ? `${selectedSets.length} selected sets` : 'All sets'}</option>{activeSets.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
-        <fieldset><legend>FRONT OF CARD</legend><div className="segmented">{(['chinese', 'pinyin', 'english', 'mixed'] as const).map(value => <button className={cn(data.preferences.prompt === value && 'selected')} key={value} onClick={() => update(d => ({ ...d, preferences: { ...d.preferences, prompt: value } }))}>{labels[value]}</button>)}</div></fieldset>
+        <fieldset><legend>MODE</legend><div className="segmented">{(['flashcards', 'writing'] as const).map(mode => <button key={mode} aria-pressed={studyMode === mode} className={cn(studyMode === mode && 'selected')} onClick={() => setStudyMode(mode)}>{mode === 'flashcards' ? 'Flashcards' : 'Writing'}</button>)}</div></fieldset>
+        {studyMode === 'flashcards' ? <><fieldset><legend>FRONT OF CARD</legend><div className="segmented">{(['chinese', 'pinyin', 'english', 'mixed'] as const).map(value => <button className={cn(data.preferences.prompt === value && 'selected')} key={value} onClick={() => update(d => ({ ...d, preferences: { ...d.preferences, prompt: value } }))}>{labels[value]}</button>)}</div></fieldset>
         <fieldset><legend>CARDS</legend><div className="chip-group">{['Learning', 'Learned', 'All', 'Starred'].map(value => <button key={value} className={cn('chip', data.preferences.filter === value && 'selected')} onClick={() => update(d => ({ ...d, preferences: { ...d.preferences, filter: value } }))}>{value === 'Starred' && <Star size={14}/>} {value}</button>)}</div></fieldset>
-        <div className="form-two"><label>ORDER<select value={data.preferences.order} onChange={e => update(d => ({ ...d, preferences: { ...d.preferences, order: e.target.value } }))}>{['Original', 'Shuffle'].map(o => <option key={o}>{o}</option>)}</select></label><label>AMOUNT<select value={data.preferences.amount} onChange={e => update(d => ({ ...d, preferences: { ...d.preferences, amount: e.target.value } }))}>{['10', '20', '30', 'All'].map(o => <option key={o}>{o}</option>)}</select></label></div><button className="button primary full start-button" onClick={() => startSession()}>Start studying <ArrowRight size={18}/></button><span className="setup-footnote">Know moves a card to Learned until you move it back or reset the set. Progress is separate for each front.</span></section></div>
+        </> : <>
+        <fieldset><legend>LEVEL</legend><div className="segmented">{(['trace', 'copy', 'recall'] as const).map(level => <button key={level} aria-pressed={writingLevel === level} className={cn(writingLevel === level && 'selected')} onClick={() => setWritingLevel(level)}>{level[0].toUpperCase() + level.slice(1)}</button>)}</div><p className="writing-option-note">{writingLevel === 'trace' ? 'Follow the character outline on the grid.' : writingLevel === 'copy' ? 'See the character above a blank grid.' : 'Write from the meaning or pinyin, without seeing the character.'}</p></fieldset>
+        <label className="field-label" htmlFor="writing-prompt">PROMPT</label><select id="writing-prompt" value={writingPrompt} onChange={event => setWritingPrompt(event.target.value as WritingPrompt)}><option value="both">English & pinyin</option><option value="english">English</option><option value="pinyin">Pinyin</option></select>
+        <fieldset><legend>WORDS</legend><div className="chip-group"><button className={cn('chip', !writingStarred && 'selected')} onClick={() => setWritingStarred(false)}>All words</button><button className={cn('chip', writingStarred && 'selected')} onClick={() => setWritingStarred(true)}><Star size={14}/>Starred words</button></div></fieldset>
+        </>}
+        <div className="form-two"><label>ORDER<select value={data.preferences.order} onChange={e => update(d => ({ ...d, preferences: { ...d.preferences, order: e.target.value } }))}>{['Original', 'Shuffle'].map(o => <option key={o}>{o}</option>)}</select></label><label>AMOUNT<select value={data.preferences.amount} onChange={e => update(d => ({ ...d, preferences: { ...d.preferences, amount: e.target.value } }))}>{['10', '20', '30', 'All'].map(o => <option key={o}>{o}</option>)}</select></label></div><button className="button primary full start-button" onClick={() => studyMode === 'writing' ? startWriting() : startSession()}>{studyMode === 'writing' ? 'Start writing' : 'Start studying'} <ArrowRight size={18}/></button><span className="setup-footnote">{studyMode === 'writing' ? 'Practise each character in the selected words. Writing results stay in this session; flashcard progress is unchanged.' : 'Know moves a card to Learned until you move it back or reset the set. Progress is separate for each front.'}</span></section></div>
       </>}
+      {screen === 'writing' && <WritingPractice entries={writingEntries} level={writingLevel} prompt={writingPrompt} onExit={() => navigate('setup')}/>}
       {screen === 'session' && current && currentEntry && <div className="session"><div className="session-header"><button className="icon-button" aria-label="End session" onClick={() => { if (window.confirm('End this session? Your answers are already saved.'))
                 navigate('home'); }}><X size={21}/></button><span>{Math.min(index + 1, queue.length)} <span className="muted">/ {queue.length}</span></span><button className="icon-button" disabled={!answers.length} aria-label="Undo last answer" onClick={undo}><RotateCcw size={19}/></button></div><div className="session-track"><span style={{ width: `${index / queue.length * 100}%` }}/></div><div className="session-context">{data.sets.find(s => s.id === currentEntry.setId)?.name}<span>·</span>{labels[current.direction]}<button type="button" className="text-button session-shuffle" disabled={queue.length - index - 1 < 2} title="Shuffle the remaining cards in this session" onClick={shuffleRemaining}><Shuffle size={15}/>Shuffle</button></div>
       <div className={cn('flashcard', revealed && 'revealed')} onTouchStart={e => { touchStart.current = e.touches[0].clientX; }} onTouchEnd={e => { if (touchStart.current === null)

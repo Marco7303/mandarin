@@ -267,7 +267,7 @@ test('preview corrections and vertical import preserve user-confirmed pronunciat
  await page.getByRole('button',{name:'Preview words'}).click();
  await expect(page.getByLabel('Import format')).toHaveValue('vertical');
  await page.getByRole('button',{name:'Import 2 words'}).click();
- await expect(page.getByText('men',{exact:true})).toBeVisible();
+ await expect(page.locator('.word-row').filter({hasText:'plural; suffix (neutral)'}).locator('.word-pinyin')).toHaveText('men');
 });
 
 test('Still learning leaves a card in Learning without extending the session, and undo restores its previous state',async({page})=>{

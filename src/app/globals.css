@@ -2970,3 +2970,37 @@ select {
   opacity:0.4;
   cursor:default;
 }
+
+/* Writing practice uses the same paper, ink and green as the flashcards. */
+.writing-session { max-width:660px; margin:0 auto; padding-bottom:24px; }
+.writing-level { text-transform:capitalize; font-size:13px; color:var(--green); }
+.writing-prompt { text-align:center; margin:24px 0 14px; }
+.writing-prompt h1 { font-size:clamp(22px,5vw,32px); margin:0 0 6px; }
+.writing-prompt p { font-size:21px; color:var(--green); margin:0 0 12px; }
+.writing-word { font-size:45px; display:flex; gap:12px; justify-content:center; margin:10px 0; }
+.writing-word span { opacity:.35; border-bottom:2px solid transparent; }
+.writing-word .current { opacity:1; border-color:var(--green); }
+.writing-prompt .muted { font-size:13px; }
+.writing-board { position:relative; width:min(100%,340px); aspect-ratio:1; margin:0 auto; border:1px solid #b9c7b2; border-radius:18px; background-color:var(--white); background-image:linear-gradient(90deg,transparent calc(50% - .5px),var(--line) 50%,transparent calc(50% + .5px)),linear-gradient(transparent calc(50% - .5px),var(--line) 50%,transparent calc(50% + .5px)),linear-gradient(45deg,transparent calc(50% - .5px),#eef0e9 50%,transparent calc(50% + .5px)),linear-gradient(-45deg,transparent calc(50% - .5px),#eef0e9 50%,transparent calc(50% + .5px)); overflow:hidden; }
+.writing-target { position:absolute; inset:0; touch-action:none; user-select:none; }
+.writing-target svg { display:block; }
+.writing-placeholder { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--muted); }
+.writing-feedback { min-height:44px; display:flex; align-items:center; justify-content:center; gap:7px; color:var(--green); font-size:14px; text-align:center; margin-bottom:8px; }
+.writing-instructions { font-size:12px; text-align:center; color:var(--muted); margin:10px 0 16px; }
+.writing-tools { display:flex; justify-content:center; gap:16px; flex-wrap:wrap; margin-bottom:20px; }
+.writing-tools button { display:inline-flex; align-items:center; gap:5px; min-height:42px; }
+.writing-actions { max-width:380px; display:flex; gap:12px; margin:auto; }
+.writing-actions button { flex:1; }
+.writing-notes { font-size:12px; line-height:1.7; color:var(--muted); margin:20px auto 0; max-width:420px; }
+.writing-notes summary { cursor:pointer; text-align:center; }
+.writing-notes a { text-decoration:underline; }
+.writing-answer { text-align:center; font-size:42px; margin:0 0 8px; }
+.writing-option-note { font-size:13px; color:var(--muted); line-height:1.6; margin:10px 0 0; }
+@media (max-width:600px) {
+  .writing-prompt { margin-top:8px; }
+  .writing-board { width:min(100%,320px); }
+  .writing-word { font-size:38px; margin:6px 0; }
+  .writing-feedback { min-height:36px; }
+  .writing-tools { gap:8px 14px; margin-bottom:14px; }
+  .writing-session .session-header { margin-bottom:12px; }
+}
