@@ -19,8 +19,13 @@ and Android phones before promoting the feature. Offline practice needs its JS
 and selected stroke data to have loaded once online.
 
 The preview has no auth or database environment variables. Test libraries and
-progress stay in the browser on the preview origin. Import a spreadsheet or
-create a set to test. Production accounts, cloud sync and community sharing
+progress stay in the browser on the preview origin. Empty guest libraries
+(including previously saved empty libraries) automatically get “Writing practice ·
+sample set”: 20 words from simple strokes to 謝謝. It is saved locally and can be
+edited like any other set. Existing sets and words are never replaced. This is
+enabled only when VERCEL_ENV=preview and VERCEL_GIT_COMMIT_REF=feature/writing-practice;
+production and other branches still start empty. No Vercel configuration is needed.
+Import a spreadsheet or create your own sets as usual. Production accounts, cloud sync and community sharing
 are unavailable here.
 
 The preview build deliberately skips database migrations. Do not copy production

@@ -1,5 +1,6 @@
 'use client';
 import dynamic from 'next/dynamic';
+import { createPreviewSample, needsPreviewSample } from '@/lib/preview-sample';
 import { buildWritingQueue, type WritingLevel, type WritingPrompt } from '@/lib/writing';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ArrowDownToLine, ArrowLeft, ArrowRight, BookOpen, Check, ChevronDown, ChevronRight, Folder as FolderIcon, Home, Leaf, MoreHorizontal, Plus, Search, Settings, Sparkles, Star, Upload, X, RotateCcw, WifiOff, Cloud, Archive, Pencil, Copy, Trash2, Share2, Compass, Shuffle } from 'lucide-react';
@@ -54,7 +55,7 @@ const key = (id: string, d: Direction) => `${id}:${d}`;
 const uid = () => crypto.randomUUID();
 const cn = (...parts: (string | false | undefined)[]) => parts.filter(Boolean).join(' ');
 const today = () => new Date().toISOString().slice(0, 10);
-export default function MandarinApp({ shareId }: { shareId?: string }) {
+export default function MandarinApp({ shareId, previewDemo = false }: { shareId?: string; previewDemo?: boolean }) {
     const [incomingShareId, setIncomingShareId] = useState(shareId || '');
     const [sharingSetId, setSharingSetId] = useState('');
     const [sharingFolderId, setSharingFolderId] = useState('');
@@ -141,6 +142,12 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
         catch {
             setStorageError(true);
         }
+        let sampleSetId = '';
+        if (needsPreviewSample(previewDemo, owner, state.sets.length, state.entries.length)) {
+            const sample = createPreviewSample();
+            sampleSetId = sample.set.id;
+            state = { ...state, folders: [...state.folders.filter(folder => folder.id !== sample.folder.id), sample.folder], sets: [sample.set], entries: sample.entries };
+        }
         libraryMeta.current = { owner, pending, baseRevision, syncedJSON: pending ? '' : JSON.stringify(state) };
         hydration.current = state;
         dataRef.current = state;
@@ -161,6 +168,7 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
                 const view = JSON.parse(sessionStorage.getItem(`mori-view:${owner}`) || 'null');
                 if (view && ['home', 'sets', 'detail', 'setup', 'settings'].includes(view.screen)) {
                     const ids = Array.isArray(view.selectedSets) ? state.sets.filter(s => view.selectedSets.includes(s.id)).map(s => s.id) : [];
+                    if (!ids.length && sampleSetId) ids.push(sampleSetId);
                     setSelectedSets(ids);
                     setActiveFolder(state.folders.some(f => f.id === view.folder) ? view.folder : 'all');
                     setShowArchived(view.archived === true);
@@ -172,7 +180,7 @@ export default function MandarinApp({ shareId }: { shareId?: string }) {
         setModal(null);
         setReady(true);
         return state;
-    }, []);
+    }, [previewDemo]);
     useEffect(() => {
         if (!ready || screen === 'shared' || screen === 'explore') return;
         try {
